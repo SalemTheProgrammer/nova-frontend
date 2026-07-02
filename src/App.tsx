@@ -1,23 +1,41 @@
 import { useState } from "react"
-import { PanelLeft } from "lucide-react"
-import { Sidebar, type NavView } from "@/components/Sidebar"
-import { ChatView } from "@/components/ChatView"
+import { AppShell } from "@/components/layout/AppShell"
+import { WebSocketProvider } from "@/hooks/useWebSocket"
+import type { NavView } from "@/components/Sidebar"
+import { MesDashboardPage } from "@/components/dashboard/MesDashboardPage"
+import { SimulateurPage } from "@/components/dashboard/SimulateurPage"
+import { MachinesPage } from "@/components/dashboard/MachinesPage"
+import { TRSPage } from "@/components/dashboard/TRSPage"
+import { ArretsPage } from "@/components/dashboard/ArretsPage"
+import { QualitePage } from "@/components/dashboard/QualitePage"
+import { MaintenancePage } from "@/components/dashboard/MaintenancePage"
 import { StockPage } from "@/components/dashboard/StockPage"
 import { OrdresPage } from "@/components/dashboard/OrdresPage"
 import { ArticlesPage } from "@/components/dashboard/ArticlesPage"
 import { MatieresPage } from "@/components/dashboard/MatieresPage"
 import { LignesPage } from "@/components/dashboard/LignesPage"
 import { FournisseursPage } from "@/components/dashboard/FournisseursPage"
-import { NormesPage } from "@/components/dashboard/NormesPage"
 
 function App() {
-  const [view, setView] = useState<NavView>("assistant")
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [view, setView] = useState<NavView>("dashboard")
+  const [ligneId, setLigneId] = useState<number | null>(null)
 
   function renderView() {
     switch (view) {
-      case "assistant":
-        return <ChatView />
+      case "dashboard":
+        return <MesDashboardPage ligneId={ligneId} />
+      case "simulateur":
+        return <SimulateurPage ligneId={ligneId} />
+      case "machines":
+        return <MachinesPage ligneId={ligneId} />
+      case "trs":
+        return <TRSPage ligneId={ligneId} />
+      case "arrets":
+        return <ArretsPage />
+      case "qualite":
+        return <QualitePage />
+      case "maintenance":
+        return <MaintenancePage />
       case "stock":
         return <StockPage />
       case "ordres":
@@ -30,31 +48,15 @@ function App() {
         return <LignesPage />
       case "fournisseurs":
         return <FournisseursPage />
-      case "normes":
-        return <NormesPage />
     }
   }
 
   return (
-    <div className="flex h-svh overflow-hidden bg-background">
-      <Sidebar
-        view={view}
-        onChange={setView}
-        open={sidebarOpen}
-        onToggle={() => setSidebarOpen((v) => !v)}
-      />
-      <div className="relative flex flex-1 flex-col overflow-hidden">
-        {!sidebarOpen && (
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="absolute left-3 top-3 z-40 rounded-md border border-border bg-background p-1.5 text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground"
-          >
-            <PanelLeft className="size-4" />
-          </button>
-        )}
-        <div className="flex flex-1 flex-col overflow-y-auto">{renderView()}</div>
-      </div>
-    </div>
+    <WebSocketProvider>
+      <AppShell view={view} onChangeView={setView} ligneId={ligneId} onChangeLigne={setLigneId}>
+        {renderView()}
+      </AppShell>
+    </WebSocketProvider>
   )
 }
 

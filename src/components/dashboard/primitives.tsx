@@ -1,5 +1,5 @@
-import { type ReactNode } from "react"
-import { X } from "lucide-react"
+import { useState, type ReactNode } from "react"
+import { ChevronDown, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export function Page({
@@ -7,12 +7,30 @@ export function Page({
   description,
   actions,
   children,
+  fullHeight = false,
 }: {
   title: string
   description?: string
   actions?: ReactNode
   children: ReactNode
+  fullHeight?: boolean
 }) {
+  if (fullHeight) {
+    return (
+      <div className="flex h-full flex-col overflow-hidden px-5 pb-4 pt-4">
+        <div className="mb-3 flex shrink-0 items-center justify-between gap-4">
+          <div className="flex items-baseline gap-3">
+            <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+            {description && (
+              <p className="hidden text-sm text-muted-foreground md:block">{description}</p>
+            )}
+          </div>
+          {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+        </div>
+        <div className="min-h-0 flex-1">{children}</div>
+      </div>
+    )
+  }
   return (
     <div className="w-full px-6 py-6">
       <div className="mb-6 flex items-start justify-between gap-4">
@@ -29,9 +47,22 @@ export function Page({
   )
 }
 
-export function Card({ children, className }: { children: ReactNode; className?: string }) {
+export function Card({
+  children,
+  className,
+  onClick,
+}: {
+  children: ReactNode
+  className?: string
+  onClick?: () => void
+}) {
   return (
-    <div className={cn("rounded-xl border border-border bg-card", className)}>{children}</div>
+    <div
+      onClick={onClick}
+      className={cn("rounded-xl border border-border bg-card", className)}
+    >
+      {children}
+    </div>
   )
 }
 
@@ -178,6 +209,31 @@ export function EmptyState({ message }: { message: string }) {
   return (
     <div className="rounded-xl border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
       {message}
+    </div>
+  )
+}
+
+/** Cache le détail technique derrière un clic — replié par défaut pour un écran simple. */
+export function Disclosure({
+  label,
+  children,
+  defaultOpen = false,
+}: {
+  label: string
+  children: ReactNode
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+      >
+        <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} />
+        {label}
+      </button>
+      {open && <div className="mt-3">{children}</div>}
     </div>
   )
 }

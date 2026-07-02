@@ -1,35 +1,70 @@
+import { useEffect, useState } from "react"
 import {
-  BookText,
+  AlertTriangle,
   ClipboardList,
+  Cpu,
   Factory,
   FlaskConical,
+  Gauge,
   LayoutDashboard,
-  MessageSquare,
   Package,
   PanelLeftClose,
+  ShieldCheck,
   Truck,
+  Wifi,
+  WifiOff,
+  Wrench,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { lignesApi } from "@/lib/api"
+import type { LigneProduction } from "@/lib/types"
+import { useWebSocket } from "@/hooks/useWebSocket"
 
 export type NavView =
-  | "assistant"
+  | "dashboard"
+  | "simulateur"
+  | "machines"
+  | "trs"
+  | "arrets"
+  | "qualite"
+  | "maintenance"
   | "stock"
   | "ordres"
   | "articles"
   | "matieres"
   | "lignes"
   | "fournisseurs"
-  | "normes"
 
-const NAV: { view: NavView; label: string; icon: typeof MessageSquare }[] = [
-  { view: "assistant", label: "Assistant", icon: MessageSquare },
-  { view: "stock", label: "Tableau de bord", icon: LayoutDashboard },
-  { view: "ordres", label: "Ordres de fabrication", icon: ClipboardList },
-  { view: "articles", label: "Articles", icon: Package },
-  { view: "matieres", label: "Matières premières", icon: FlaskConical },
-  { view: "lignes", label: "Lignes de production", icon: Factory },
-  { view: "fournisseurs", label: "Fournisseurs", icon: Truck },
-  { view: "normes", label: "Normes", icon: BookText },
+interface NavItem {
+  view: NavView
+  label: string
+  icon: typeof LayoutDashboard
+}
+
+const GROUPES: { titre: string; items: NavItem[] }[] = [
+  {
+    titre: "Atelier",
+    items: [
+      { view: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { view: "simulateur", label: "Simulateur", icon: Cpu },
+      { view: "machines", label: "Machines", icon: Factory },
+      { view: "trs", label: "TRS", icon: Gauge },
+      { view: "arrets", label: "Arrêts", icon: AlertTriangle },
+      { view: "qualite", label: "Qualité", icon: ShieldCheck },
+      { view: "maintenance", label: "Maintenance", icon: Wrench },
+    ],
+  },
+  {
+    titre: "Gestion",
+    items: [
+      { view: "stock", label: "Stock", icon: Package },
+      { view: "ordres", label: "Ordres", icon: ClipboardList },
+      { view: "articles", label: "Articles", icon: Package },
+      { view: "matieres", label: "Matières premières", icon: FlaskConical },
+      { view: "lignes", label: "Lignes", icon: Factory },
+      { view: "fournisseurs", label: "Fournisseurs", icon: Truck },
+    ],
+  },
 ]
 
 interface SidebarProps {
@@ -37,9 +72,18 @@ interface SidebarProps {
   onChange: (v: NavView) => void
   open: boolean
   onToggle: () => void
+  ligneId: number | null
+  onChangeLigne: (id: number | null) => void
 }
 
-export function Sidebar({ view, onChange, open, onToggle }: SidebarProps) {
+export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne }: SidebarProps) {
+  const [lignes, setLignes] = useState<LigneProduction[]>([])
+  const { connected } = useWebSocket()
+
+  useEffect(() => {
+    lignesApi.list().then(setLignes).catch(() => {})
+  }, [])
+
   return (
     <aside
       className={cn(
@@ -48,7 +92,7 @@ export function Sidebar({ view, onChange, open, onToggle }: SidebarProps) {
       )}
     >
       <div className="flex items-center justify-between px-3 py-4">
-        <img src="/r.png" alt="Nova Data" className="mx-auto h-10" />
+        <img src="/r.png" alt="Nova" className="mx-auto h-10" />
         <button
           onClick={onToggle}
           className="rounded-md p-1.5 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
@@ -57,33 +101,57 @@ export function Sidebar({ view, onChange, open, onToggle }: SidebarProps) {
         </button>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-2">
-        {NAV.map((item) => (
-          <button
-            key={item.view}
-            onClick={() => onChange(item.view)}
-            className={cn(
-              "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-              view === item.view
-                ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-                : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50",
-            )}
-          >
-            <item.icon className="size-4 shrink-0" />
-            <span className="truncate">{item.label}</span>
-          </button>
+      <div className="border-b border-sidebar-border px-3 pb-3">
+        <select
+          value={ligneId ?? ""}
+          onChange={(e) => onChangeLigne(e.target.value ? Number(e.target.value) : null)}
+          className="w-full rounded-lg border border-sidebar-border bg-background px-2.5 py-2 text-sm outline-none focus:border-ring"
+        >
+          <option value="">Toutes les lignes</option>
+          {lignes.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.designation}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <nav className="flex-1 space-y-4 overflow-y-auto px-2 py-3">
+        {GROUPES.map((groupe) => (
+          <div key={groupe.titre}>
+            <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+              {groupe.titre}
+            </p>
+            <div className="space-y-0.5">
+              {groupe.items.map((item) => (
+                <button
+                  key={item.view}
+                  onClick={() => onChange(item.view)}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                    view === item.view
+                      ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50",
+                  )}
+                >
+                  <item.icon className="size-4 shrink-0" />
+                  <span className="truncate">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 
       <div className="border-t border-sidebar-border px-3 py-3">
-        <div className="flex items-center gap-2">
-          <div className="flex size-7 items-center justify-center rounded-full bg-muted text-xs font-medium">
-            N
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium text-sidebar-foreground">Nova Fabrication</p>
-            <p className="truncate text-xs text-muted-foreground">v0.1.0</p>
-          </div>
+        <div
+          className={cn(
+            "flex items-center gap-1.5 text-xs",
+            connected ? "text-emerald-600 dark:text-emerald-400" : "text-destructive",
+          )}
+        >
+          {connected ? <Wifi className="size-3.5" /> : <WifiOff className="size-3.5" />}
+          {connected ? "Connecté" : "Déconnecté"}
         </div>
       </div>
     </aside>
