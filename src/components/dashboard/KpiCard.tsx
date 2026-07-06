@@ -23,12 +23,12 @@ export function KpiCard({
   }[tone]
 
   return (
-    <Card className="p-4">
+    <Card className="p-3.5">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        {Icon && <Icon className="size-4 text-muted-foreground" />}
+        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+        {Icon && <Icon className="size-3.5 text-muted-foreground" />}
       </div>
-      <p className={cn("text-2xl font-semibold tabular-nums", toneClass)}>{value}</p>
+      <p className={cn("font-mono text-xl font-semibold tabular-nums", toneClass)}>{value}</p>
       {sublabel && <p className="mt-1 text-xs text-muted-foreground">{sublabel}</p>}
     </Card>
   )

@@ -22,9 +22,9 @@ function resume(payload: Record<string, unknown>): string {
 export function ActivityFeed({ evenements }: { evenements: ActiviteEvenement[] }) {
   const items = evenements ?? []
   return (
-    <Card className="flex h-full min-h-[420px] flex-col overflow-hidden p-0">
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h3 className="text-base font-semibold">Journal d'activité — toute l'usine</h3>
+    <Card className="flex h-full min-h-0 flex-col overflow-hidden p-0">
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+        <h3 className="text-sm font-semibold">Journal d'activité</h3>
         <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
           <span className="relative flex size-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
@@ -33,7 +33,7 @@ export function ActivityFeed({ evenements }: { evenements: ActiviteEvenement[] }
           En direct
         </span>
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {items.length === 0 ? (
           <EmptyState message="Aucune activité pour le moment." />
         ) : (

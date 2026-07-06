@@ -16,7 +16,10 @@ export function useDashboardData(ligneId: number | null) {
 
     async function load() {
       try {
-        const [r, m] = await Promise.all([kpiApi.dashboard(), machinesApi.list(ligneId ?? undefined)])
+        const [r, m] = await Promise.all([
+          kpiApi.dashboard(ligneId),
+          machinesApi.list(ligneId ?? undefined),
+        ])
         if (!cancelled) {
           setResume(r)
           setMachines(m)

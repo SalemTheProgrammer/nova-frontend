@@ -1,7 +1,7 @@
 import { ArrowLeft } from "lucide-react"
 import { useMachineState } from "@/hooks/useMachineState"
 import { Button, EmptyState } from "@/components/dashboard/primitives"
-import { LiveDeviceState } from "@/components/simulator/LiveDeviceState"
+import { LiveDeviceState } from "@/components/machines/LiveDeviceState"
 import { MachineTimeline } from "@/components/machines/MachineTimeline"
 import { MachineTagTable } from "@/components/machines/MachineTagTable"
 

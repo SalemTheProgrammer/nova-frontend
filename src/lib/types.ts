@@ -57,6 +57,33 @@ export interface LigneProduction {
   actif: boolean
 }
 
+// --------------------------- Flux des lignes (graphe n8n) --------------------------- //
+export interface LigneNode {
+  id: number
+  code: string
+  designation: string
+  actif: boolean
+  article_ids: number[]
+}
+
+export interface LigneLien {
+  id: number
+  source_id: number
+  target_id: number
+}
+
+export interface ArticleMini {
+  id: number
+  code: string
+  designation: string
+}
+
+export interface LigneFlux {
+  lignes: LigneNode[]
+  liens: LigneLien[]
+  articles: ArticleMini[]
+}
+
 export interface NomenclatureLigne {
   id: number
   matiere_premiere_id: number
@@ -127,28 +154,38 @@ export interface StockMP {
   nb_lots: number
 }
 
-export interface Norme {
+export interface DocumentRag {
   id: number
   nom: string
   fichier: string
+  categorie: string | null
   nb_pages: number
   nb_chunks: number
   statut: string
   date_creation: string
 }
 
-export interface NormePassage {
-  norme_id: number | null
-  norme_nom: string
+export interface DocumentPassage {
+  document_id: number | null
+  document_nom: string
   source: string
   page: number | null
   score: number
   citation: string
+  /** Phrases du chunk qui répondent à la question — seul ce texte est surligné. */
+  extraits?: string[]
 }
 
-export interface NormeSearchResult {
+export interface DocumentSearchResult {
   query: string
-  passages: NormePassage[]
+  passages: DocumentPassage[]
+}
+
+/** Contexte de consultation d'un document : PDF à ouvrir + passages à surligner. */
+export interface DocumentFocus {
+  documentId: number
+  page: number
+  passages: DocumentPassage[]
 }
 
 // --------------------------- MES / SCADA --------------------------- //
@@ -345,6 +382,97 @@ export interface ActiviteEvenement {
   created_at: string
 }
 
+// --------------------------- Superviseur autonome --------------------------- //
+export type StatutProposition = "PROPOSEE" | "APPROUVEE" | "REJETEE" | "EXECUTEE" | "ECHOUEE"
+
+export interface AgentProposal {
+  id: number
+  type: string
+  severite: SeveriteAlerte
+  titre: string
+  diagnostic: string
+  action_libelle: string
+  action: Record<string, unknown>
+  statut: StatutProposition
+  machine_id: number | null
+  ordre_fabrication_id: number | null
+  resultat: string | null
+  created_at: string
+  decided_at: string | null
+}
+
+// --------------------------- Agent streaming --------------------------- //
+export interface AgentArtifact {
+  kind: string
+  [key: string]: unknown
+}
+
+export type AgentStreamEvent =
+  | { type: "turn_start" }
+  | { type: "token"; content: string }
+  | { type: "tool_start"; id: string; name: string; input?: unknown }
+  | { type: "tool_end"; id: string; name: string; output: string; artifact: AgentArtifact | null }
+  | { type: "done"; thread_id: string; response: string }
+  | { type: "error"; message: string }
+
+export interface BesoinArtifact {
+  code: string
+  designation: string
+  unite: string
+  requis: string
+  disponible: string
+  manquant: string
+  suffisant: boolean
+}
+
+export interface LigneScoreArtifact {
+  ligne_id: number
+  code: string
+  designation: string
+  score: number
+  trs: number | null
+  machines_total: number
+  machines_libres: number
+  machines_en_panne: number
+  raison: string
+}
+
+export interface RisqueMachineArtifact {
+  machine_id: number
+  code: string
+  nom: string
+  score: number
+  niveau: "faible" | "modere" | "eleve"
+  nb_pannes_7j: number
+  jours_depuis_maintenance: number | null
+  recommandation: string
+}
+
+export interface OFActif {
+  id: number
+  numero: string
+  article_code: string
+  article_designation: string
+  lot_produit: string | null
+  quantite_planifiee: string
+  quantite_bonne: string
+  quantite_rejetee: string
+  statut: StatutOF
+  ligne_production_id: number | null
+}
+
+export interface ArretCategorie {
+  nb_actifs: number
+  duree_totale_s: string
+}
+
+export interface MatiereConsommee {
+  code_mp: string
+  designation_mp: string
+  numero_lot: string
+  quantite: string
+}
+
 export interface DashboardResume {
   trs_global: string
   disponibilite: string
@@ -362,10 +490,21 @@ export interface DashboardResume {
   temps_arret_total_s: string
   mttr_s: string
   mtbf_s: string
+  mttf_s: string
   nb_pannes: number
   top_causes_arret: CauseArretResume[]
   alertes_actives: AlertRead[]
   serie_production: PointSerie[]
   cadence_actuelle_par_min: string
   activite_recente: ActiviteEvenement[]
+  of_actif: OFActif | null
+  taux_charge: string
+  taux_engagement: string
+  cadence_nominale_par_min: string
+  production_theorique: string
+  reste_a_produire: string
+  arrets_planifies: ArretCategorie
+  arrets_non_planifies: ArretCategorie
+  micro_arrets_nombre: number
+  matieres_consommees: MatiereConsommee[]
 }

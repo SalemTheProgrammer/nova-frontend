@@ -9,39 +9,44 @@ export function Page({
   children,
   fullHeight = false,
 }: {
-  title: string
+  title?: string
   description?: string
   actions?: ReactNode
   children: ReactNode
   fullHeight?: boolean
 }) {
+  const hasHeader = Boolean(title) || Boolean(actions)
   if (fullHeight) {
     return (
       <div className="flex h-full flex-col overflow-hidden px-5 pb-4 pt-4">
-        <div className="mb-3 flex shrink-0 items-center justify-between gap-4">
-          <div className="flex items-baseline gap-3">
-            <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
-            {description && (
-              <p className="hidden text-sm text-muted-foreground md:block">{description}</p>
-            )}
+        {hasHeader && (
+          <div className="mb-3 flex shrink-0 items-center justify-between gap-4">
+            <div className="flex items-baseline gap-3">
+              {title && <h1 className="text-lg font-semibold tracking-tight">{title}</h1>}
+              {description && (
+                <p className="hidden text-sm text-muted-foreground md:block">{description}</p>
+              )}
+            </div>
+            {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
           </div>
-          {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
-        </div>
+        )}
         <div className="min-h-0 flex-1">{children}</div>
       </div>
     )
   }
   return (
     <div className="w-full px-6 py-6">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-          {description && (
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-          )}
+      {hasHeader && (
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            {title && <h1 className="text-xl font-semibold tracking-tight">{title}</h1>}
+            {description && (
+              <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+            )}
+          </div>
+          {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
         </div>
-        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
-      </div>
+      )}
       {children}
     </div>
   )
@@ -209,6 +214,18 @@ export function EmptyState({ message }: { message: string }) {
   return (
     <div className="rounded-xl border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
       {message}
+    </div>
+  )
+}
+
+/** Étiquette de section — encode le regroupement thématique d'une rangée de cartes. */
+export function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="mb-2 flex items-center gap-2">
+      <span className="size-1.5 rounded-full bg-primary" />
+      <h2 className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+        {children}
+      </h2>
     </div>
   )
 }

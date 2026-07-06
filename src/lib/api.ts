@@ -1,4 +1,6 @@
 import type {
+  AgentProposal,
+  AgentStreamEvent,
   Article,
   CauseRebut,
   DashboardResume,
@@ -10,10 +12,13 @@ import type {
   Machine,
   MachineEvent,
   MaintenanceEventRead,
+  DocumentRag,
+  DocumentSearchResult,
+  LigneFlux,
+  LigneLien,
+  LigneNode,
   MatierePremiere,
   Nomenclature,
-  Norme,
-  NormeSearchResult,
   OrdreFabrication,
   QualiteResume,
   QualityEventRead,
@@ -25,6 +30,10 @@ import type {
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api/v1"
 const API_KEY = import.meta.env.VITE_API_KEY ?? "dev-local-key"
+
+/** Origine du backend FastAPI — sert aussi la console simulateur en HTML (`/simulateur`). */
+export const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8000"
+export const SIMULATOR_CONSOLE_URL = `${BACKEND_ORIGIN}/simulateur`
 
 export interface ChatResponse {
   thread_id: string
@@ -86,6 +95,7 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
 export const api = {
   get: <T>(path: string) => request<T>("GET", path),
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
+  put: <T>(path: string, body?: unknown) => request<T>("PUT", path, body),
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, body),
   del: (path: string) => request<void>("DELETE", path),
 }
@@ -96,6 +106,78 @@ export function sendChatMessage(message: string, threadId?: string): Promise<Cha
     message,
     ...(threadId ? { thread_id: threadId } : {}),
   })
+}
+
+/**
+ * Envoie un message à l'agent en mode streaming (SSE sur POST) et relaie chaque
+ * événement (tokens, appels d'outils, artifacts) à `onEvent`. Résout quand le
+ * flux est terminé.
+ */
+export async function streamChatMessage(
+  message: string,
+  threadId: string | undefined,
+  onEvent: (event: AgentStreamEvent) => void,
+  signal?: AbortSignal,
+  mode: "texte" | "voix" = "texte",
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/chat/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+    body: JSON.stringify({ message, mode, ...(threadId ? { thread_id: threadId } : {}) }),
+    signal,
+  })
+  if (!res.ok || !res.body) {
+    throw new Error(`Le flux agent a échoué (${res.status})`)
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ""
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const frames = buffer.split("\n\n")
+    buffer = frames.pop() ?? ""
+    for (const frame of frames) {
+      const line = frame.split("\n").find((l) => l.startsWith("data: "))
+      if (!line) continue
+      try {
+        onEvent(JSON.parse(line.slice(6)) as AgentStreamEvent)
+      } catch {
+        // frame malformée : ignorée
+      }
+    }
+  }
+}
+
+// --------------------------- Superviseur autonome --------------------------- //
+export const agentApi = {
+  propositions: (enAttenteSeulement = false) =>
+    api.get<AgentProposal[]>(
+      `/agent/propositions${enAttenteSeulement ? "?en_attente_seulement=true" : ""}`,
+    ),
+  approuver: (id: number) => api.post<AgentProposal>(`/agent/propositions/${id}/approuver`),
+  rejeter: (id: number) => api.post<AgentProposal>(`/agent/propositions/${id}/rejeter`),
+}
+
+// --------------------------- Voix (OpenAI) --------------------------- //
+export const voiceApi = {
+  transcribe: async (audio: Blob): Promise<string> => {
+    const fd = new FormData()
+    fd.append("file", audio, "audio.webm")
+    const res = await upload<{ text: string }>("/voice/transcribe", fd)
+    return res.text
+  },
+  speak: async (text: string): Promise<Blob> => {
+    const res = await fetch(`${API_BASE}/voice/speak`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+      body: JSON.stringify({ text }),
+    })
+    if (!res.ok) throw new Error(`Synthèse vocale échouée (${res.status})`)
+    return res.blob()
+  },
 }
 
 // --------------------------- Articles --------------------------- //
@@ -153,6 +235,19 @@ export const lignesApi = {
   remove: (id: number) => api.del(`/lignes-production/${id}`),
 }
 
+// --------------------------- Flux des lignes (graphe n8n) --------------------------- //
+export const ligneFluxApi = {
+  get: () => api.get<LigneFlux>("/lignes-production/flux"),
+  setArticles: (ligneId: number, articleIds: number[]) =>
+    api.put<LigneNode>(`/lignes-production/${ligneId}/articles`, { article_ids: articleIds }),
+  createLien: (sourceId: number, targetId: number) =>
+    api.post<LigneLien>("/lignes-production/liens", {
+      source_id: sourceId,
+      target_id: targetId,
+    }),
+  removeLien: (lienId: number) => api.del(`/lignes-production/liens/${lienId}`),
+}
+
 // --------------------------- Ordres de fabrication --------------------------- //
 export const ordresApi = {
   list: () => api.get<OrdreFabrication[]>("/ordres-fabrication"),
@@ -171,18 +266,36 @@ export const ordresApi = {
     api.patch<OrdreFabrication>(`/ordres-fabrication/${id}/statut`, { statut }),
 }
 
-// --------------------------- Normes (RAG) --------------------------- //
-export const normesApi = {
-  list: () => api.get<Norme[]>("/normes"),
-  upload: (nom: string, file: File) => {
+// --------------------------- Base documentaire (RAG) --------------------------- //
+export const documentsApi = {
+  list: () => api.get<DocumentRag[]>("/documents"),
+  upload: (nom: string, file: File, categorie?: string) => {
     const fd = new FormData()
     fd.append("nom", nom)
+    if (categorie?.trim()) fd.append("categorie", categorie.trim())
     fd.append("file", file)
-    return upload<Norme>("/normes", fd)
+    return upload<DocumentRag>("/documents", fd)
   },
-  remove: (id: number) => api.del(`/normes/${id}`),
+  remove: (id: number) => api.del(`/documents/${id}`),
   search: (q: string) =>
-    api.get<NormeSearchResult>(`/normes/recherche?q=${encodeURIComponent(q)}`),
+    api.get<DocumentSearchResult>(`/documents/recherche?q=${encodeURIComponent(q)}`),
+  /** PDF source d'un document, récupéré en blob (l'en-tête X-API-Key est requis). */
+  pdfBlob: async (id: number): Promise<Blob> => {
+    const res = await fetch(`${API_BASE}/documents/${id}/pdf`, {
+      headers: { "X-API-Key": API_KEY },
+    })
+    if (!res.ok) {
+      let message = `PDF indisponible (${res.status})`
+      try {
+        const data = (await res.json()) as ApiError & { detail?: string }
+        message = data.error?.message ?? data.detail ?? message
+      } catch {
+        // no JSON body
+      }
+      throw new Error(message)
+    }
+    return res.blob()
+  },
 }
 
 // --------------------------- Machines --------------------------- //
@@ -229,6 +342,12 @@ export const simulatorApi = {
     }),
   envoyerTag: (machineId: number, tag: string, valeur: number | string) =>
     api.post<Machine>(`/simulateur/machines/${machineId}/tag`, { tag, valeur }),
+  // Mode auto + scénarios de démonstration
+  autoStatut: () => api.get<{ actif: boolean }>("/simulateur/auto"),
+  autoStart: () => api.post<{ actif: boolean }>("/simulateur/auto/start"),
+  autoStop: () => api.post<{ actif: boolean }>("/simulateur/auto/stop"),
+  scenario: (nom: "panne-critique" | "derive-qualite" | "rupture-stock") =>
+    api.post<{ scenario: string; message: string }>(`/simulateur/scenarios/${nom}`),
 }
 
 // --------------------------- Arrêts --------------------------- //
@@ -262,7 +381,10 @@ export const maintenanceApi = {
 export const kpiApi = {
   trs: (scope: "machine" | "ligne" | "of", id: number) =>
     api.get<TRSRead>(`/kpi/trs?scope=${scope}&id=${id}`),
-  dashboard: () => api.get<DashboardResume>("/dashboard/resume"),
+  dashboard: (ligneId?: number | null) =>
+    api.get<DashboardResume>(
+      `/dashboard/resume${ligneId != null ? `?ligne_id=${ligneId}` : ""}`,
+    ),
 }
 
 // --------------------------- AI panel --------------------------- //

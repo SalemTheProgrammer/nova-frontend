@@ -20,16 +20,18 @@ export function Gauge({
   value,
   label,
   size = 180,
+  emphasis = "default",
 }: {
   value: number // 0..1
   label: string
   size?: number
+  emphasis?: "default" | "hero"
 }) {
   const uid = useId().replace(/:/g, "")
   const pct = Math.max(0, Math.min(1, value))
   const width = size
   const height = size * 0.66
-  const strokeWidth = Math.max(9, size * 0.085)
+  const strokeWidth = Math.max(9, size * (emphasis === "hero" ? 0.095 : 0.085))
   const cx = width / 2
   const cy = height - strokeWidth * 0.4 - 2
   const r = width / 2 - strokeWidth / 2 - 4
@@ -131,15 +133,18 @@ export function Gauge({
 
       <div className="-mt-1 flex flex-col items-center">
         <span
-          className={cn("font-bold leading-none tabular-nums", tone)}
-          style={{ fontSize: Math.max(16, size * 0.19) }}
+          className={cn("font-mono font-bold leading-none tabular-nums", tone)}
+          style={{ fontSize: Math.max(16, size * (emphasis === "hero" ? 0.22 : 0.19)) }}
         >
           {Math.round(pct * 100)}
           <span style={{ fontSize: Math.max(10, size * 0.09) }}>%</span>
         </span>
         {label && (
           <span
-            className="mt-1 text-center font-medium text-muted-foreground"
+            className={cn(
+              "mt-1 text-center font-medium text-muted-foreground",
+              emphasis === "hero" && "uppercase tracking-wide",
+            )}
             style={{ fontSize: Math.max(10, size * 0.072) }}
           >
             {label}

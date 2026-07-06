@@ -1,19 +1,16 @@
 import { useEffect, useState } from "react"
 import {
-  AlertTriangle,
+  BookOpen,
   ClipboardList,
-  Cpu,
   Factory,
   FlaskConical,
-  Gauge,
   LayoutDashboard,
+  MessageSquare,
   Package,
   PanelLeftClose,
-  ShieldCheck,
   Truck,
   Wifi,
   WifiOff,
-  Wrench,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { lignesApi } from "@/lib/api"
@@ -22,7 +19,6 @@ import { useWebSocket } from "@/hooks/useWebSocket"
 
 export type NavView =
   | "dashboard"
-  | "simulateur"
   | "machines"
   | "trs"
   | "arrets"
@@ -34,6 +30,9 @@ export type NavView =
   | "matieres"
   | "lignes"
   | "fournisseurs"
+  | "documents"
+  | "simulateur"
+  | "assistant"
 
 interface NavItem {
   view: NavView
@@ -46,12 +45,8 @@ const GROUPES: { titre: string; items: NavItem[] }[] = [
     titre: "Atelier",
     items: [
       { view: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { view: "simulateur", label: "Simulateur", icon: Cpu },
       { view: "machines", label: "Machines", icon: Factory },
-      { view: "trs", label: "TRS", icon: Gauge },
-      { view: "arrets", label: "Arrêts", icon: AlertTriangle },
-      { view: "qualite", label: "Qualité", icon: ShieldCheck },
-      { view: "maintenance", label: "Maintenance", icon: Wrench },
+      { view: "assistant", label: "Assistant Nova", icon: MessageSquare },
     ],
   },
   {
@@ -63,6 +58,7 @@ const GROUPES: { titre: string; items: NavItem[] }[] = [
       { view: "matieres", label: "Matières premières", icon: FlaskConical },
       { view: "lignes", label: "Lignes", icon: Factory },
       { view: "fournisseurs", label: "Fournisseurs", icon: Truck },
+      { view: "documents", label: "Documents", icon: BookOpen },
     ],
   },
 ]

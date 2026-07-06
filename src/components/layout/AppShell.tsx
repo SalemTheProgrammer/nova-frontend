@@ -1,24 +1,34 @@
 import { useState, type ReactNode } from "react"
-import { PanelLeft, Sparkles, X } from "lucide-react"
+import { PanelLeft, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Sidebar, type NavView } from "@/components/Sidebar"
 import { RightAIAgent } from "@/components/layout/RightAIAgent"
+import { NovaOrb } from "@/components/agent/NovaOrb"
+import type { DocumentPassage } from "@/lib/types"
+import { useProposals } from "@/hooks/useProposals"
 
 export function AppShell({
   view,
   onChangeView,
   ligneId,
   onChangeLigne,
+  onDocumentsPassages,
+  aiPanelOpen,
+  onAiPanelOpenChange,
   children,
 }: {
   view: NavView
   onChangeView: (v: NavView) => void
   ligneId: number | null
   onChangeLigne: (id: number | null) => void
+  onDocumentsPassages: (passages: DocumentPassage[]) => void
+  aiPanelOpen: boolean
+  onAiPanelOpenChange: (open: boolean) => void
   children: ReactNode
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [aiPanelOpen, setAiPanelOpen] = useState(false)
+  const setAiPanelOpen = onAiPanelOpenChange
+  const { pending } = useProposals()
 
   return (
     <div className="flex h-svh overflow-hidden bg-background">
@@ -40,21 +50,38 @@ export function AppShell({
           </button>
         )}
         <div className="flex flex-1 flex-col overflow-y-auto">{children}</div>
-        {aiPanelOpen && <RightAIAgent onClose={() => setAiPanelOpen(false)} />}
+        {aiPanelOpen && (
+          <RightAIAgent
+            onClose={() => setAiPanelOpen(false)}
+            onNavigate={onChangeView}
+            onDocumentsPassages={onDocumentsPassages}
+          />
+        )}
       </div>
 
+      {/* Bouton flottant : la mini-bulle vivante de Nova — même identité que le
+          mode vocal plein écran (violet « réfléchit » quand des décisions attendent). */}
       <button
-        onClick={() => setAiPanelOpen((v) => !v)}
+        onClick={() => setAiPanelOpen(!aiPanelOpen)}
         className={cn(
-          "fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full px-5 py-3",
-          "text-sm font-medium shadow-lg transition-transform hover:scale-105",
-          aiPanelOpen
-            ? "bg-foreground text-background"
-            : "bg-primary text-primary-foreground",
+          "fixed bottom-6 right-6 z-50 flex items-center gap-1.5 rounded-full py-2 pl-2 pr-4",
+          "border border-border bg-background text-sm font-medium text-foreground",
+          "shadow-lg transition-transform hover:scale-105",
         )}
       >
-        {aiPanelOpen ? <X className="size-4" /> : <Sparkles className="size-4" />}
+        {aiPanelOpen ? (
+          <span className="flex size-8 items-center justify-center">
+            <X className="size-4" />
+          </span>
+        ) : (
+          <NovaOrb etat={pending.length > 0 ? "reflexion" : "repos"} className="size-8" />
+        )}
         Nova
+        {!aiPanelOpen && pending.length > 0 && (
+          <span className="inline-flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
+            {pending.length}
+          </span>
+        )}
       </button>
     </div>
   )

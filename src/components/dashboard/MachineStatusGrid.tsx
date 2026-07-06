@@ -35,30 +35,45 @@ const STATUT_INFO: Record<
 
 export function MachineStatusGrid({ machines }: { machines: Machine[] }) {
   return (
-    <Card className="p-5">
-      <h3 className="mb-4 text-base font-semibold">Machines</h3>
-      {machines.length === 0 ? (
-        <EmptyState message="Aucune machine configurée." />
-      ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {machines.map((m) => {
-            const info = STATUT_INFO[m.statut]
-            const Icon = info.icon
-            return (
-              <div
-                key={m.id}
-                className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 ${info.classes}`}
-              >
-                <Icon className="size-8 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-semibold">{m.nom}</p>
-                  <p className="text-sm opacity-80">{info.label}</p>
+    <Card className="flex h-full min-h-0 flex-col overflow-hidden p-0">
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+        <h3 className="text-sm font-semibold">Machines</h3>
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {machines.filter((m) => m.statut === "MARCHE").length}/{machines.length} en marche
+        </span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        {machines.length === 0 ? (
+          <EmptyState message="Aucune machine configurée." />
+        ) : (
+          <div className="grid grid-cols-1 gap-2">
+            {machines.map((m) => {
+              const info = STATUT_INFO[m.statut]
+              const Icon = info.icon
+              return (
+                <div
+                  key={m.id}
+                  className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 ${info.classes}`}
+                >
+                  <Icon className="size-5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold leading-tight">{m.nom}</p>
+                    <p className="text-xs opacity-80">
+                      {info.label}
+                      {m.numero_of_actif ? ` · ${m.numero_of_actif}` : ""}
+                    </p>
+                  </div>
+                  {m.trs != null && (
+                    <span className="shrink-0 font-mono text-xs font-semibold tabular-nums">
+                      {Math.round(Number(m.trs) * 100)}%
+                    </span>
+                  )}
                 </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+              )
+            })}
+          </div>
+        )}
+      </div>
     </Card>
   )
 }
