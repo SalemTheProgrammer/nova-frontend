@@ -3,11 +3,15 @@ import {
   BookOpen,
   CheckCircle2,
   ClipboardList,
+  Clock,
   Compass,
   Factory,
   FileText,
   FlaskConical,
   Gauge,
+  ShieldCheck,
+  ThumbsDown,
+  ThumbsUp,
   XCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -19,8 +23,20 @@ import type {
   RisqueMachineArtifact,
 } from "@/lib/types"
 
-/** Rend l'artifact structuré d'un outil sous forme de carte riche. */
-export function ArtifactCard({ artifact }: { artifact: AgentArtifact }) {
+/** Rend l'artifact structuré d'un outil sous forme de carte riche.
+ *
+ * `onQuickReply` (optionnel) permet aux cartes d'action (confirmation en
+ * attente) d'offrir un vrai bouton « Oui »/« Non » plutôt que de forcer
+ * l'opérateur à retaper sa réponse : cliquer envoie le même message qu'il
+ * aurait tapé, la conversation continue normalement.
+ */
+export function ArtifactCard({
+  artifact,
+  onQuickReply,
+}: {
+  artifact: AgentArtifact
+  onQuickReply?: (text: string) => void
+}) {
   switch (artifact.kind) {
     case "faisabilite":
       return <FaisabiliteCard artifact={artifact} />
@@ -42,6 +58,10 @@ export function ArtifactCard({ artifact }: { artifact: AgentArtifact }) {
       return <ChartCard artifact={artifact} />
     case "whatif":
       return <WhatifCard artifact={artifact} />
+    case "confirmation_attente":
+      return <ConfirmationAttenteCard artifact={artifact} onQuickReply={onQuickReply} />
+    case "action_executee":
+      return <ActionExecuteeCard artifact={artifact} />
     default:
       return null
   }
@@ -301,6 +321,59 @@ function WhatifCard({ artifact }: { artifact: AgentArtifact }) {
         </p>
         <p className="italic text-muted-foreground">Hypothèse — rien n'a été modifié.</p>
       </div>
+    </Shell>
+  )
+}
+
+/**
+ * Nova propose une action réelle (SCADA, création d'OF, envoi) mais ne l'a PAS
+ * exécutée : le backend refuse tant que l'opérateur n'a pas répondu depuis un
+ * message séparé (voir `agent/tools/confirmation_gate.py`, ce n'est pas qu'une
+ * formule de politesse). Rendu volontairement chaleureux et jamais vert : ça
+ * n'a rien fait, ça attend un humain.
+ */
+function ConfirmationAttenteCard({
+  artifact,
+  onQuickReply,
+}: {
+  artifact: AgentArtifact
+  onQuickReply?: (text: string) => void
+}) {
+  return (
+    <Shell icon={Clock} title="En attente de votre feu vert" tone="amber">
+      <div className="space-y-2.5 text-xs">
+        <p className="text-foreground/85">{String(artifact.libelle ?? "")}</p>
+        <p className="italic text-muted-foreground">Rien n'a été modifié pour l'instant.</p>
+        {onQuickReply && (
+          <div className="flex items-center gap-2 pt-0.5">
+            <button
+              onClick={() => onQuickReply("Oui, confirme.")}
+              className="inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/85"
+            >
+              <ThumbsUp className="size-3" />
+              Oui, vas-y
+            </button>
+            <button
+              onClick={() => onQuickReply("Non, annule.")}
+              className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <ThumbsDown className="size-3" />
+              Non
+            </button>
+          </div>
+        )}
+      </div>
+    </Shell>
+  )
+}
+
+/** Une action irréversible/sortante vient réellement de s'exécuter — rendu
+ * distinct d'une simple lecture pour que l'opérateur voie que quelque chose
+ * de réel vient de se passer sur l'atelier. */
+function ActionExecuteeCard({ artifact }: { artifact: AgentArtifact }) {
+  return (
+    <Shell icon={ShieldCheck} title="Action exécutée" tone="green">
+      <p className="text-xs text-foreground/85">{String(artifact.libelle ?? "")}</p>
     </Shell>
   )
 }

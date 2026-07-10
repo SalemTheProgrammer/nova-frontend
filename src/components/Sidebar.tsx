@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import {
   BookOpen,
+  Boxes,
   ClipboardList,
   Factory,
   FlaskConical,
@@ -20,6 +21,7 @@ import { useWebSocket } from "@/hooks/useWebSocket"
 export type NavView =
   | "dashboard"
   | "machines"
+  | "jumeau"
   | "trs"
   | "arrets"
   | "qualite"
@@ -46,6 +48,7 @@ const GROUPES: { titre: string; items: NavItem[] }[] = [
     items: [
       { view: "dashboard", label: "Dashboard", icon: LayoutDashboard },
       { view: "machines", label: "Machines", icon: Factory },
+      { view: "jumeau", label: "Jumeau numérique", icon: Boxes },
       { view: "assistant", label: "Assistant Nova", icon: MessageSquare },
     ],
   },

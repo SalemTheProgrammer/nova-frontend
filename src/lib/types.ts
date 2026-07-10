@@ -3,7 +3,10 @@ export type TypeArticle = "PF" | "PSF"
 export type StatutLot = "DISPONIBLE" | "BLOQUE" | "PERIME" | "EPUISE"
 export type StatutOF = "BROUILLON" | "PLANIFIE" | "EN_COURS" | "TERMINE" | "ANNULE"
 
+export type TypeMouvement = "ENTREE" | "SORTIE" | "AJUSTEMENT"
+
 export const UNITES: Unite[] = ["KG", "G", "L", "ML", "UN"]
+export const STATUTS_LOT: StatutLot[] = ["DISPONIBLE", "BLOQUE", "PERIME", "EPUISE"]
 export const STATUTS_OF: StatutOF[] = [
   "BROUILLON",
   "PLANIFIE",
@@ -41,6 +44,25 @@ export interface Lot {
   date_reception: string
   date_peremption: string | null
   statut: StatutLot
+}
+
+/** Lot enrichi du code/désignation/unité de sa matière première (endpoint /stock). */
+export interface LotDetail extends Lot {
+  code_mp: string
+  designation_mp: string
+  unite: Unite
+}
+
+export interface Mouvement {
+  id: number
+  type_mouvement: TypeMouvement
+  matiere_premiere_id: number
+  lot_matiere_premiere_id: number | null
+  quantite: string
+  reference_type: string | null
+  reference_id: number | null
+  commentaire: string | null
+  date_mouvement: string
 }
 
 export interface Fournisseur {

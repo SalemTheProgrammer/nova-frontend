@@ -21,9 +21,11 @@ import { AgentTurnView } from "@/components/agent/AgentMessage"
 import { ProposalCard } from "@/components/agent/ProposalCard"
 import type { NavView } from "@/components/Sidebar"
 import type { DocumentPassage } from "@/lib/types"
+import { twinBus, type TwinCommand } from "@/components/twin/twinBus"
 
 const VALID_VIEWS: readonly string[] = [
   "dashboard",
+  "jumeau",
   "machines",
   "trs",
   "arrets",
@@ -82,6 +84,16 @@ export function RightAIAgent({
       if (artifact.kind === "documents" && Array.isArray(artifact.passages)) {
         // Ouvre le PDF source avec les passages cités surlignés.
         onDocumentsPassages(artifact.passages as DocumentPassage[])
+      }
+      if (artifact.kind === "twin_command" && typeof artifact.action === "string") {
+        // Nova pilote le jumeau : on ouvre la page (le map de navigation ouvre
+        // déjà `jumeau`) et on transmet la commande au moteur de simulation.
+        onNavigate("jumeau")
+        twinBus.emit({
+          action: artifact.action as TwinCommand["action"],
+          cible: artifact.cible as string | undefined,
+          valeur: artifact.valeur as number | boolean | undefined,
+        })
       }
     },
   )
@@ -223,7 +235,7 @@ export function RightAIAgent({
           </div>
         )}
         {turns.map((turn) => (
-          <AgentTurnView key={turn.id} turn={turn} />
+          <AgentTurnView key={turn.id} turn={turn} onQuickReply={(text) => void send(text)} />
         ))}
         {loading && turns[turns.length - 1]?.segments.length === 0 && (
           <div className="flex items-center gap-2 pl-10 text-xs text-muted-foreground">

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { AppShell } from "@/components/layout/AppShell"
 import { WebSocketProvider } from "@/hooks/useWebSocket"
 import type { NavView } from "@/components/Sidebar"
@@ -18,12 +18,19 @@ import { LignesPage } from "@/components/dashboard/LignesPage"
 import { FournisseursPage } from "@/components/dashboard/FournisseursPage"
 import { ConsoleUsinePage } from "@/components/dashboard/ConsoleUsinePage"
 import { NovaVoicePage } from "@/components/dashboard/NovaVoicePage"
+import { DigitalTwinPage } from "@/components/twin/DigitalTwinPage"
 
 function App() {
   const [view, setView] = useState<NavView>("dashboard")
   const [ligneId, setLigneId] = useState<number | null>(null)
   const [docFocus, setDocFocus] = useState<DocumentFocus | null>(null)
   const [aiPanelOpen, setAiPanelOpen] = useState(false)
+
+  // Le jumeau numérique se pilote via Nova : on ouvre l'assistant à droite
+  // dès qu'on arrive sur cette page.
+  useEffect(() => {
+    if (view === "jumeau") setAiPanelOpen(true)
+  }, [view])
 
   /** L'agent a cité des documents : ouvre le viewer PDF sur le premier passage localisable. */
   function handleDocumentsPassages(passages: DocumentPassage[]) {
@@ -39,6 +46,9 @@ function App() {
         return <MesDashboardPage ligneId={ligneId} />
       case "machines":
         return <MachinesPage ligneId={ligneId} />
+      case "jumeau":
+        // Jumeau numérique 3D de la ligne de conditionnement (temps réel).
+        return <DigitalTwinPage ligneId={ligneId} />
       case "trs":
         return <TRSPage ligneId={ligneId} />
       case "arrets":

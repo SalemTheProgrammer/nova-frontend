@@ -9,6 +9,7 @@ import type {
   Fournisseur,
   LigneProduction,
   Lot,
+  LotDetail,
   Machine,
   MachineEvent,
   MaintenanceEventRead,
@@ -18,10 +19,12 @@ import type {
   LigneLien,
   LigneNode,
   MatierePremiere,
+  Mouvement,
   Nomenclature,
   OrdreFabrication,
   QualiteResume,
   QualityEventRead,
+  StatutLot,
   StatutOF,
   StockMP,
   TRSRead,
@@ -35,10 +38,6 @@ const API_KEY = import.meta.env.VITE_API_KEY ?? "dev-local-key"
 export const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8000"
 export const SIMULATOR_CONSOLE_URL = `${BACKEND_ORIGIN}/simulateur`
 
-export interface ChatResponse {
-  thread_id: string
-  response: string
-}
 
 export interface ApiError {
   error: { code: string; message: string; details?: Record<string, unknown> }
@@ -101,13 +100,6 @@ export const api = {
 }
 
 // --------------------------- Chat / agent --------------------------- //
-export function sendChatMessage(message: string, threadId?: string): Promise<ChatResponse> {
-  return api.post<ChatResponse>("/chat", {
-    message,
-    ...(threadId ? { thread_id: threadId } : {}),
-  })
-}
-
 /**
  * Envoie un message à l'agent en mode streaming (SSE sur POST) et relaie chaque
  * événement (tokens, appels d'outils, artifacts) à `onEvent`. Résout quand le
@@ -214,6 +206,41 @@ export const matieresApi = {
     },
   ) => api.post<Lot>(`/matieres-premieres/${id}/lots`, data),
   stock: () => api.get<StockMP[]>("/matieres-premieres/stock/etat"),
+}
+
+// --------------------------- Stock (lots + mouvements) --------------------------- //
+export const stockApi = {
+  lots: (params?: { matierePremiereId?: number; statut?: StatutLot }) => {
+    const qs = new URLSearchParams()
+    if (params?.matierePremiereId) qs.set("matiere_premiere_id", String(params.matierePremiereId))
+    if (params?.statut) qs.set("statut", params.statut)
+    const query = qs.toString()
+    return api.get<LotDetail[]>(`/stock${query ? `?${query}` : ""}`)
+  },
+  create: (data: {
+    matiere_premiere_id: number
+    numero_lot: string
+    quantite: number
+    date_reception?: string | null
+    date_peremption?: string | null
+    fournisseur_id?: number | null
+  }) => api.post<LotDetail>("/stock", data),
+  get: (lotId: number) => api.get<LotDetail>(`/stock/${lotId}`),
+  update: (
+    lotId: number,
+    data: { statut?: StatutLot; date_peremption?: string | null; fournisseur_id?: number | null },
+  ) => api.patch<LotDetail>(`/stock/${lotId}`, data),
+  ajuster: (lotId: number, quantite_restante: number, commentaire?: string) =>
+    api.post<LotDetail>(`/stock/${lotId}/ajustement`, { quantite_restante, commentaire }),
+  remove: (lotId: number) => api.del(`/stock/${lotId}`),
+  mouvements: (params?: { matierePremiereId?: number; lotId?: number; limit?: number }) => {
+    const qs = new URLSearchParams()
+    if (params?.matierePremiereId) qs.set("matiere_premiere_id", String(params.matierePremiereId))
+    if (params?.lotId) qs.set("lot_id", String(params.lotId))
+    if (params?.limit) qs.set("limit", String(params.limit))
+    const query = qs.toString()
+    return api.get<Mouvement[]>(`/stock/mouvements${query ? `?${query}` : ""}`)
+  },
 }
 
 // --------------------------- Fournisseurs --------------------------- //
