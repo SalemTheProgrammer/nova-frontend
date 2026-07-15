@@ -95,6 +95,9 @@ export function DigitalTwinPage({
 
   const [selected, setSelected] = useState<StationId | null>(() => twinSession.selectedStation)
   const [labelsOn, setLabelsOn] = useState(() => twinSession.labelsOn)
+  // Lu une seule fois : chaque sauvegarde remplace `twinSession.camera`, et lire
+  // cet objet pendant le rendu ferait varier la prop passée à la scène.
+  const [initialCamera] = useState(() => twinSession.camera)
   const [showQueue, setShowQueue] = useState(false)
   const flightRef = useRef<CameraFlight | null>(null)
   const previousLineIdRef = useRef<number | null>(null)
@@ -139,12 +142,17 @@ export function DigitalTwinPage({
     setSelected(null)
   }
 
-  function selectStation(lineId: number, station: StationId) {
-    setFocusedLineId(lineId)
-    if (ligneId !== lineId) onChangeLigne(lineId)
-    setSelected(station)
-    flightRef.current = flightTo(station, rowZById.get(lineId) ?? 0)
-  }
+  // Identité stable : `TwinScene` est mémoïsé, une callback recréée à chaque
+  // rendu rouvrirait la porte aux reconstructions inutiles de l'arbre 3D.
+  const selectStation = useCallback(
+    (lineId: number, station: StationId) => {
+      setFocusedLineId(lineId)
+      if (ligneId !== lineId) onChangeLigne(lineId)
+      setSelected(station)
+      flightRef.current = flightTo(station, rowZById.get(lineId) ?? 0)
+    },
+    [ligneId, onChangeLigne, rowZById],
+  )
 
   const saveCamera = useCallback((next: TwinCameraState) => {
     twinSession.setCamera(next)
@@ -269,7 +277,7 @@ export function DigitalTwinPage({
         lines={lines}
         flightRef={flightRef}
         labelsOn={labelsOn}
-        cameraState={twinSession.camera}
+        initialCamera={initialCamera}
         onCameraState={saveCamera}
         onSelect={selectStation}
       />

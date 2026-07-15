@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import { useFrame } from "@react-three/fiber"
 import * as THREE from "three"
 import type { StationId, TwinEngine } from "../simulation"
@@ -46,6 +46,16 @@ export function StackLight({
       }),
     }),
     [],
+  )
+
+  // Feux propres à la station : le trio meurt avec la rangée qui le porte.
+  useEffect(
+    () => () => {
+      mats.red.dispose()
+      mats.amber.dispose()
+      mats.green.dispose()
+    },
+    [mats],
   )
 
   useFrame(({ clock }) => {

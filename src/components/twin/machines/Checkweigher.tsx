@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import { useFrame } from "@react-three/fiber"
 import * as THREE from "three"
 import type { TwinEngine } from "../simulation"
@@ -13,6 +13,15 @@ import { BoxMesh, CylMesh, Feet } from "./prims"
  * de boutons, arrêt d'urgence, colonne lumineuse et tunnel de protection
  * transparent au-dessus de la bande aval.
  */
+
+/** Marquage identique sur toutes les lignes : une seule texture pour l'usine. */
+const BRAND_MAT = new THREE.MeshStandardMaterial({
+  map: textTexture("CHECKWEIGHER", { w: 512, h: 64, size: 38, color: "#565e66", weight: "700" }),
+  transparent: true,
+  roughness: 0.5,
+  metalness: 0.2,
+})
+
 export function Checkweigher({
   engine,
   position,
@@ -20,11 +29,6 @@ export function Checkweigher({
   engine: TwinEngine
   position: [number, number, number]
 }) {
-  const brandMat = useMemo(() => {
-    const tex = textTexture("CHECKWEIGHER", { w: 512, h: 64, size: 38, color: "#565e66", weight: "700" })
-    return new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.5, metalness: 0.2 })
-  }, [])
-
   return (
     <group position={position}>
       {/* Caisson sous bande (cellule de pesée) */}
@@ -38,7 +42,7 @@ export function Checkweigher({
         <BoxMesh s={[0.82, 0.06, 0.59]} p={[0, 1.87, 0]} m={M.frame} />
 
         {/* Marquage constructeur */}
-        <mesh position={[0, 1.72, 0.278]} material={brandMat}>
+        <mesh position={[0, 1.72, 0.278]} material={BRAND_MAT}>
           <planeGeometry args={[0.6, 0.075]} />
         </mesh>
 
@@ -86,6 +90,8 @@ function BlastFlash({ engine }: { engine: TwinEngine }) {
       }),
     [],
   )
+  // Opacité propre à la ligne : le matériau vit et meurt avec sa rangée.
+  useEffect(() => () => mat.dispose(), [mat])
   // Le cône pointe dans le sens du jet (+z) et disparaît en ~0,4 s.
   useFrame(() => {
     mat.opacity = engine.blastPulse * 0.75

@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react"
+import { useRef } from "react"
 import { useFrame } from "@react-three/fiber"
 import * as THREE from "three"
 import type { TwinEngine } from "../simulation"
@@ -14,6 +14,15 @@ import { AXE_Z, BoxMesh, CylMesh, Feet } from "./prims"
  * lumineuse. Les presses montent et descendent tant que la machine est en MARCHE,
  * les bobines tournent au rythme de la ligne.
  */
+
+/** Marquage identique sur toutes les lignes : une seule texture pour l'usine. */
+const BRAND_MAT = new THREE.MeshStandardMaterial({
+  map: textTexture("PHARMA TECH", { w: 1024, h: 128, size: 68, color: "#274a92", weight: "800" }),
+  transparent: true,
+  roughness: 0.5,
+  metalness: 0.1,
+})
+
 export function Blistereuse({
   engine,
   position,
@@ -21,11 +30,6 @@ export function Blistereuse({
   engine: TwinEngine
   position: [number, number, number]
 }) {
-  const brandMat = useMemo(() => {
-    const tex = textTexture("PHARMA TECH", { w: 1024, h: 128, size: 68, color: "#274a92", weight: "800" })
-    return new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.5, metalness: 0.1 })
-  }, [])
-
   const presses = useRef<Array<THREE.Group | null>>([])
   const bigRoll = useRef<THREE.Mesh>(null)
   const smallRoll = useRef<THREE.Mesh>(null)
@@ -90,7 +94,7 @@ export function Blistereuse({
       {/* Capot supérieur + marquage PHARMA TECH */}
       <BoxMesh s={[5.3, 0.44, 1.66]} p={[0, 2.52, 0]} m={M.alu} />
       <BoxMesh s={[5.3, 0.05, 1.7]} p={[0, 2.32, 0]} m={M.frame} />
-      <mesh position={[-1.55, 2.52, 0.842]} material={brandMat}>
+      <mesh position={[-1.55, 2.52, 0.842]} material={BRAND_MAT}>
         <planeGeometry args={[1.7, 0.21]} />
       </mesh>
       {/* Logo rond côté droit du capot */}

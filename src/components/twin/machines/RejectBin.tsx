@@ -1,4 +1,3 @@
-import { useMemo } from "react"
 import * as THREE from "three"
 import { M, textTexture } from "../materials"
 import { BoxMesh, CylMesh } from "./prims"
@@ -8,6 +7,17 @@ import { BoxMesh, CylMesh } from "./prims"
  * de l'image : parois inox, marquage REJET sur la face avant, lueur bleue
  * intérieure et goulotte inclinée côté ligne.
  */
+
+/** Marquage identique sur les neuf bacs de l'usine : une seule texture. */
+const LABEL_MAT = new THREE.MeshStandardMaterial({
+  map: textTexture("REJET", { w: 512, h: 160, size: 86, color: "#4a5058", weight: "800" }),
+  transparent: true,
+  metalness: 0.4,
+  roughness: 0.4,
+  polygonOffset: true,
+  polygonOffsetFactor: -1,
+})
+
 export function RejectBin({
   position,
   chuteFromY = 0,
@@ -18,18 +28,6 @@ export function RejectBin({
   chuteFromY?: number
   rotationY?: number
 }) {
-  const labelMat = useMemo(() => {
-    const tex = textTexture("REJET", { w: 512, h: 160, size: 86, color: "#4a5058", weight: "800" })
-    return new THREE.MeshStandardMaterial({
-      map: tex,
-      transparent: true,
-      metalness: 0.4,
-      roughness: 0.4,
-      polygonOffset: true,
-      polygonOffsetFactor: -1,
-    })
-  }, [])
-
   const W = 0.94 // largeur (x)
   const D = 0.78 // profondeur (z)
   const H = 0.6 // hauteur des parois
@@ -54,7 +52,7 @@ export function RejectBin({
       <pointLight position={[0, baseY + 0.4, 0]} color="#2f7dff" intensity={1.6} distance={1.6} decay={2} />
 
       {/* Marquage REJET (face avant) */}
-      <mesh position={[0, baseY + H * 0.52, D / 2 + T / 2 + 0.002]} material={labelMat}>
+      <mesh position={[0, baseY + H * 0.52, D / 2 + T / 2 + 0.002]} material={LABEL_MAT}>
         <planeGeometry args={[0.62, 0.19]} />
       </mesh>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, type MutableRefObject } from "react"
+import { memo, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
 import { ContactShadows, Html, OrbitControls, useCursor } from "@react-three/drei"
 import * as THREE from "three"
@@ -132,18 +132,31 @@ type ControlsApi = {
   removeEventListener: (event: "end", callback: () => void) => void
 }
 
-function CameraMemory({ value, onChange }: { value: TwinCameraState | null; onChange: (next: TwinCameraState) => void }) {
+/**
+ * Restaure le cadrage mémorisé au premier montage, puis sauvegarde à la fin de
+ * chaque interaction. Les identités variables (`initial`, `onChange`) passent par
+ * des refs : sauvegarder recrée l'objet mémorisé, et si l'effet en dépendait il
+ * se rejouerait à chaque rendu — donc plusieurs fois par seconde, au rythme du
+ * temps réel MES — en replaçant la caméra sous les doigts de l'opérateur.
+ */
+function CameraMemory({ initial, onChange }: { initial: TwinCameraState | null; onChange: (next: TwinCameraState) => void }) {
   const camera = useThree((state) => state.camera)
   const controls = useThree((state) => state.controls) as unknown as ControlsApi | null
+  const restoreRef = useRef(initial)
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
 
   useEffect(() => {
     if (!controls) return
-    if (value) {
-      camera.position.fromArray(value.position)
-      controls.target.fromArray(value.target)
+    const saved = restoreRef.current
+    if (saved) {
+      // Une seule restauration : ensuite la caméra appartient à l'opérateur.
+      restoreRef.current = null
+      camera.position.fromArray(saved.position)
+      controls.target.fromArray(saved.target)
       controls.update()
     }
-    const save = () => onChange({
+    const save = () => onChangeRef.current({
       position: camera.position.toArray() as TwinCameraState["position"],
       target: controls.target.toArray() as TwinCameraState["target"],
     })
@@ -152,7 +165,7 @@ function CameraMemory({ value, onChange }: { value: TwinCameraState | null; onCh
       save()
       controls.removeEventListener("end", save)
     }
-  }, [camera, controls, onChange, value])
+  }, [camera, controls])
   return null
 }
 
@@ -240,22 +253,30 @@ function ProductionLineRow({
   )
 }
 
-export function TwinScene({
+/**
+ * Mémoïsé : la scène ne se reconstruit que sur un vrai changement de lignes ou
+ * d'annotations. Les compteurs et les animations vivent dans le moteur et sont
+ * lus par `useFrame` — le temps réel MES n'a aucune raison de faire re-rendre
+ * l'arbre 3D plusieurs fois par seconde.
+ */
+export const TwinScene = memo(function TwinScene({
   lines,
   flightRef,
   labelsOn,
-  cameraState,
+  initialCamera,
   onCameraState,
   onSelect,
 }: {
   lines: TwinLineScene[]
   flightRef: FlightRef
   labelsOn: boolean
-  cameraState: TwinCameraState | null
+  initialCamera: TwinCameraState | null
   onCameraState: (next: TwinCameraState) => void
   onSelect: (lineId: number, station: StationId) => void
 }) {
-  const initial = ensembleFlight(lines.length)
+  // R3F ré-applique toute prop dont l'identité change : un `target` recréé à
+  // chaque rendu recadrerait OrbitControls sur la vue d'ensemble en plein orbit.
+  const initial = useMemo(() => ensembleFlight(lines.length), [lines.length])
   const depth = Math.max(0, lines.length - 1) * ROW_DEPTH
 
   return (
@@ -319,8 +340,8 @@ export function TwinScene({
         maxDistance={70}
         target={initial.target}
       />
-      <CameraMemory value={cameraState} onChange={onCameraState} />
+      <CameraMemory initial={initialCamera} onChange={onCameraState} />
       <CameraRig flightRef={flightRef} />
     </Canvas>
   )
-}
+})
