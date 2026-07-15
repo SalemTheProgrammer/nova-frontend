@@ -94,30 +94,30 @@ export function ProposalCard({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+      <div className="flex flex-col gap-1.5 px-3 py-2.5">
         {pending ? (
           <>
             <button
               onClick={() => decide(true)}
               disabled={busy !== null}
               className={cn(
-                "inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md",
-                "bg-primary text-xs font-medium text-primary-foreground transition-colors",
+                "inline-flex min-h-7 w-full items-center justify-center gap-1.5 rounded-md px-2.5 py-1",
+                "bg-primary text-xs font-medium leading-snug text-primary-foreground transition-colors",
                 "hover:bg-primary/85 disabled:opacity-50",
               )}
             >
               {busy === "approve" ? (
-                <Loader2 className="size-3 animate-spin" />
+                <Loader2 className="size-3 shrink-0 animate-spin" />
               ) : (
-                <Check className="size-3" />
+                <Check className="size-3 shrink-0" />
               )}
-              {proposal.action_libelle}
+              <span>{proposal.action_libelle}</span>
             </button>
             <button
               onClick={() => decide(false)}
               disabled={busy !== null}
               className={cn(
-                "inline-flex h-7 items-center justify-center gap-1 rounded-md border border-border",
+                "inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-border",
                 "px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent",
                 "hover:text-foreground disabled:opacity-50",
               )}

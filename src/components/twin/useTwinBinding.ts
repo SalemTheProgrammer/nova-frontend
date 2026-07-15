@@ -1,170 +1,267 @@
-import { useEffect, useMemo, useState } from "react"
-import { machinesApi, simulatorApi } from "@/lib/api"
-import type { CauseRebut, Machine } from "@/lib/types"
-import { useWebSocket } from "@/hooks/useWebSocket"
-import { STATIONS, type StationId, type TwinEngine, type TwinEvent } from "./simulation"
+import { useEffect, useState } from "react"
+import { ligneFluxApi, machinesApi, ordresApi } from "@/lib/api"
+import type { ArticleMini, LigneNode, Machine, OrdreFabrication } from "@/lib/types"
+import { connectDashboardSocket } from "@/lib/websocket"
+import { compatibleArticles } from "./lineProfiles"
+import { STATIONS, TwinEngine, type StationId } from "./simulation"
 
-/**
- * Liaison bidirectionnelle jumeau ↔ MES :
- * - les machines de la ligne sont associées aux postes du jumeau par leur nom
- *   (« blist… » → blistéreuse, etc.), les restantes dans l'ordre ;
- * - les statuts remontent en direct via le WebSocket (une PANNE côté MES fait
- *   clignoter la colonne rouge et fige le tronçon dans la 3D) ;
- * - les commandes redescendent via l'API simulateur quand le poste est lié ;
- * - si `publier` est actif, chaque bonne pièce / rejet du jumeau est poussé
- *   vers le MES (les dashboards TRS bougent en même temps que la 3D).
- * Sans backend, tout fonctionne en local : le jumeau reste autonome.
- */
+/** Snapshot fonctionnel d'une ligne : données MES + catalogue réellement compatible. */
+export interface TwinLineContext {
+  line: LigneNode
+  articles: ArticleMini[]
+  machines: Machine[]
+  activeOrder: OrdreFabrication | null
+}
 
-const PATTERNS: Array<[StationId, RegExp]> = [
-  ["blistereuse", /blist/i],
-  ["trieuse", /trieuse|pond[eé]r|checkweig|pes[eé]e/i],
-  ["vignetteuse", /vignett|[ée]tiquet|label/i],
+interface FleetSnapshot {
+  contexts: TwinLineContext[]
+  backendOk: boolean
+  lastSyncAt: number | null
+}
+
+const engines = new Map<number, TwinEngine>()
+const knownProduction = new Map<number, number>()
+const knownRejects = new Map<number, number>()
+
+let cachedSnapshot: FleetSnapshot = {
+  contexts: [],
+  backendOk: false,
+  lastSyncAt: null,
+}
+
+const OFFLINE_CONTEXTS: TwinLineContext[] = [
+  {
+    line: { id: 1, code: "LIGNE-COMP-01", designation: "Ligne comprimés 1", actif: true, article_ids: [1] },
+    articles: [{ id: 1, code: "PARA500", designation: "Paracétamol 500 mg" }],
+    machines: [],
+    activeOrder: null,
+  },
+  {
+    line: { id: 2, code: "L2", designation: "Ligne conditionnement 2", actif: true, article_ids: [1] },
+    articles: [{ id: 1, code: "PARA500", designation: "Paracétamol 500 mg" }],
+    machines: [],
+    activeOrder: null,
+  },
+  {
+    line: { id: 3, code: "LIGNE-COMP-03", designation: "Ligne comprimés 3", actif: true, article_ids: [2, 3, 4] },
+    articles: [
+      { id: 2, code: "IBU400", designation: "Ibuprofène 400 mg" },
+      { id: 3, code: "PARA1000", designation: "Paracétamol 1 000 mg" },
+      { id: 4, code: "PARA-SIROP", designation: "Sirop de paracétamol" },
+    ],
+    machines: [],
+    activeOrder: null,
+  },
+  {
+    line: { id: 4, code: "LIGNE-COND-04", designation: "Ligne conditionnement 4", actif: true, article_ids: [10, 11, 12] },
+    articles: [
+      { id: 10, code: "TALC-POUDRE", designation: "Talc pharmaceutique" },
+      { id: 11, code: "SACHET-EFFER", designation: "Sachets effervescents" },
+      { id: 12, code: "POUDRE-BEBE", designation: "Poudre pour bébé" },
+    ],
+    machines: [],
+    activeOrder: null,
+  },
 ]
 
-const CAUSE_PAR_POSTE: Record<StationId, CauseRebut> = {
-  blistereuse: "DEFAUT_VISUEL",
-  trieuse: "DEFAUT_DIMENSIONNEL",
-  vignetteuse: "NON_CONFORMITE_PROCESS",
+export function twinEngineForLine(lineId: number): TwinEngine {
+  let engine = engines.get(lineId)
+  if (!engine) {
+    engine = new TwinEngine()
+    engines.set(lineId, engine)
+  }
+  return engine
 }
 
-export interface TwinCommands {
-  demarrer: (id: StationId) => void
-  pause: (id: StationId) => void
-  arreter: (id: StationId) => void
-  panne: (id: StationId) => void
-  resoudre: (id: StationId) => void
-  demarrerTout: () => void
-  pauseTout: () => void
-  arreterTout: () => void
+function takeMatching(remaining: Machine[], pattern: RegExp): Machine | null {
+  const index = remaining.findIndex((machine) => pattern.test(`${machine.code} ${machine.nom}`))
+  if (index < 0) return null
+  return remaining.splice(index, 1)[0]
 }
 
-export function useTwinBinding(
-  engine: TwinEngine,
-  ligneId: number | null,
-  publier: boolean,
-): { backendOk: boolean; commands: TwinCommands } {
-  const [backendOk, setBackendOk] = useState(false)
-  const { lastMessage } = useWebSocket()
+/**
+ * Les quatre lignes n'ont pas le même nombre de machines. On conserve trois
+ * étapes visuelles cohérentes et on lie les vraies machines pertinentes : tête
+ * de procédé, contrôle, fin de ligne. Une étape sans machine reste explicite.
+ */
+function bindLineMachines(engine: TwinEngine, machines: Machine[]) {
+  const remaining = [...machines].sort((a, b) => a.code.localeCompare(b.code, "fr"))
+  const mapping: Partial<Record<StationId, Machine>> = {}
 
-  // Association machines MES → postes du jumeau.
+  mapping.blistereuse =
+    takeMatching(remaining, /blist|comprim|doseuse|prépar|prepar/i) ?? remaining.shift() ?? undefined
+  mapping.trieuse = takeMatching(remaining, /trieuse|pond|pes[eé]|check|contr[oô]le/i) ?? undefined
+  mapping.vignetteuse =
+    takeMatching(remaining, /vignett|[ée]tiquet|encart|conditionneuse|sachet/i) ??
+    remaining.pop() ??
+    undefined
+
+  if (!mapping.trieuse && remaining.length > 0) mapping.trieuse = remaining.shift()
+  if (!mapping.vignetteuse && remaining.length > 0) mapping.vignetteuse = remaining.pop()
+
+  for (const station of STATIONS) {
+    const machine = mapping[station]
+    engine.bindMachine(station, machine?.id ?? null, machine?.code ?? null)
+    if (!machine) {
+      engine.setStatut(station, "ARRET")
+      engine.setCounts(station, 0, 0)
+    }
+  }
+  engine.mesDriven = true
+}
+
+function applyMachine(machine: Machine, seed: boolean) {
+  const engine = twinEngineForLine(machine.ligne_production_id)
+  const station = engine.stationByMachine(machine.id)
+  if (!station) return
+
+  engine.setStatut(station.id, machine.statut)
+  engine.setCounts(station.id, machine.quantite_bonne, machine.quantite_rejetee)
+  if (station.id === "blistereuse") {
+    const cycle = Number(machine.temps_cycle_actuel_s ?? machine.temps_cycle_cible_s)
+    if (cycle > 0) engine.setCycle(cycle)
+  }
+  engine.syncVirtualStations()
+
+  const total = machine.quantite_bonne + machine.quantite_rejetee
+  const previousTotal = knownProduction.get(machine.id)
+  const previousRejects = knownRejects.get(machine.id)
+  if (!seed) {
+    if (station.id === "blistereuse" && previousTotal != null && total > previousTotal) {
+      engine.queueSpawn(total - previousTotal)
+    }
+    if (previousRejects != null && machine.quantite_rejetee > previousRejects) {
+      engine.queueReject(station.id, machine.quantite_rejetee - previousRejects)
+    }
+    if (station.id === "trieuse" && previousTotal != null && previousRejects != null) {
+      if (machine.quantite_rejetee > previousRejects) engine.recordWeight(false)
+      else if (total > previousTotal) engine.recordWeight(true)
+    }
+  }
+  knownProduction.set(machine.id, total)
+  knownRejects.set(machine.id, machine.quantite_rejetee)
+}
+
+function activeOrderForLine(
+  lineId: number,
+  machines: Machine[],
+  orders: OrdreFabrication[],
+): OrdreFabrication | null {
+  const activeId = machines.find((machine) => machine.ordre_fabrication_id != null)
+    ?.ordre_fabrication_id
+  return (
+    orders.find((order) => order.id === activeId && order.statut === "EN_COURS") ??
+    orders.find((order) => order.ligne_production_id === lineId && order.statut === "EN_COURS") ??
+    null
+  )
+}
+
+/**
+ * Synchronise les quatre lignes en une seule connexion. Les moteurs restent en
+ * mémoire entre deux visites ; au retour, un snapshot frais recale les compteurs
+ * et les deltas survenus en arrière-plan sont rejoués sans réinitialiser la scène.
+ */
+export function useTwinBinding(): FleetSnapshot {
+  const [snapshot, setSnapshot] = useState<FleetSnapshot>(cachedSnapshot)
+
   useEffect(() => {
-    let annule = false
-    machinesApi
-      .list(ligneId ?? undefined)
-      .then((machines) => {
-        if (annule) return
-        setBackendOk(true)
-        const libres = new Set<StationId>(STATIONS)
-        const assign = (id: StationId, m: Machine) => {
-          engine.bindMachine(id, m.id, m.code)
-          engine.setStatut(id, m.statut)
-          libres.delete(id)
-        }
-        for (const [id, pattern] of PATTERNS) {
-          const m = machines.find((mm) => pattern.test(mm.nom) || pattern.test(mm.code))
-          if (m) assign(id, m)
-        }
-        // Machines restantes → postes encore libres, dans l'ordre.
-        const dejaLiees = new Set(
-          STATIONS.map((id) => engine.stations[id].machineId).filter((v) => v != null),
-        )
-        for (const m of machines) {
-          if (dejaLiees.has(m.id)) continue
-          const poste = STATIONS.find((id) => libres.has(id))
-          if (!poste) break
-          assign(poste, m)
-          dejaLiees.add(m.id)
-        }
-      })
-      .catch(() => {
-        if (annule) return
-        setBackendOk(false)
-        for (const id of STATIONS) engine.bindMachine(id, null, null)
-      })
-    return () => {
-      annule = true
-    }
-  }, [engine, ligneId])
+    let cancelled = false
 
-  // Statuts temps réel entrants (WebSocket MES).
-  useEffect(() => {
-    if (!lastMessage || lastMessage.type !== "machine_update") return
-    const m = lastMessage.machine as unknown as Machine
-    if (!m?.id) return
-    const st = engine.stationByMachine(m.id)
-    if (st) engine.setStatut(st.id, m.statut)
-  }, [lastMessage, engine])
+    const load = async () => {
+      const [flux, allMachines, orders] = await Promise.all([
+        ligneFluxApi.get(),
+        machinesApi.list(),
+        ordresApi.list(),
+      ])
+      if (cancelled) return
 
-  // Publication des événements de production vers le MES.
-  useEffect(() => {
-    if (!publier) {
-      engine.onEvent = null
-      return
-    }
-    engine.onEvent = (ev: TwinEvent) => {
-      const machineId = engine.stations[ev.station].machineId
-      if (machineId == null) return
-      const appel =
-        ev.type === "bonne"
-          ? simulatorApi.produireBonne(machineId, 1)
-          : simulatorApi.produireRebut(machineId, 1, CAUSE_PAR_POSTE[ev.station])
-      appel.catch(() => {})
-    }
-    return () => {
-      engine.onEvent = null
-    }
-  }, [publier, engine])
-
-  const commands = useMemo<TwinCommands>(() => {
-    const surMachine = (id: StationId, action: (machineId: number) => Promise<Machine>) => {
-      const machineId = engine.stations[id].machineId
-      if (machineId != null) action(machineId).catch(() => {})
-    }
-    return {
-      demarrer: (id) => {
-        engine.setStatut(id, "MARCHE")
-        surMachine(id, (m) => simulatorApi.start(m))
-      },
-      pause: (id) => {
-        engine.setStatut(id, "PAUSE")
-        surMachine(id, (m) => simulatorApi.pause(m))
-      },
-      arreter: (id) => {
-        engine.setStatut(id, "ARRET")
-        surMachine(id, (m) => simulatorApi.stop(m))
-      },
-      panne: (id) => {
-        engine.setStatut(id, "PANNE")
-        surMachine(id, (m) => simulatorApi.alarme(m, "Panne simulée depuis le jumeau numérique"))
-      },
-      resoudre: (id) => {
-        engine.setStatut(id, "MARCHE")
-        surMachine(id, async (m) => {
-          await simulatorApi.resoudreArret(m, "Résolu depuis le jumeau numérique").catch(() => {})
-          return simulatorApi.start(m)
+      const contexts = flux.lignes
+        .filter((line) => line.actif)
+        .map((line) => {
+          const machines = allMachines.filter((machine) => machine.ligne_production_id === line.id)
+          const engine = twinEngineForLine(line.id)
+          const activeOrder = activeOrderForLine(line.id, machines, orders)
+          bindLineMachines(engine, machines)
+          engine.setActiveOrder(activeOrder?.id ?? null)
+          for (const machine of machines) applyMachine(machine, !knownProduction.has(machine.id))
+          engine.syncVirtualStations()
+          return {
+            line,
+            articles: compatibleArticles(line, flux.articles),
+            machines,
+            activeOrder,
+          }
         })
-      },
-      demarrerTout: () => {
-        for (const id of STATIONS) {
-          engine.setStatut(id, "MARCHE")
-          surMachine(id, (m) => simulatorApi.start(m))
-        }
-      },
-      pauseTout: () => {
-        for (const id of STATIONS) {
-          engine.setStatut(id, "PAUSE")
-          surMachine(id, (m) => simulatorApi.pause(m))
-        }
-      },
-      arreterTout: () => {
-        for (const id of STATIONS) {
-          engine.setStatut(id, "ARRET")
-          surMachine(id, (m) => simulatorApi.stop(m))
-        }
-      },
-    }
-  }, [engine])
 
-  return { backendOk, commands }
+      cachedSnapshot = { contexts, backendOk: true, lastSyncAt: Date.now() }
+      setSnapshot(cachedSnapshot)
+    }
+
+    void load().catch(() => {
+      if (cancelled) return
+      cachedSnapshot = {
+        ...cachedSnapshot,
+        contexts: cachedSnapshot.contexts.length > 0 ? cachedSnapshot.contexts : OFFLINE_CONTEXTS,
+        backendOk: false,
+      }
+      for (const engine of engines.values()) engine.mesDriven = false
+      setSnapshot(cachedSnapshot)
+    })
+
+    const closeSocket = connectDashboardSocket(
+      (data) => {
+        if (cancelled) return
+        const message = data as { type?: string; machine?: Machine }
+        if (message.type !== "machine_update" || !message.machine?.id) return
+        const previous = cachedSnapshot.contexts
+          .flatMap((context) => context.machines)
+          .find((machine) => machine.id === message.machine!.id)
+        applyMachine(message.machine, !knownProduction.has(message.machine.id))
+
+        // Bascule d'OF (ex. Nova a déplacé la production vers une autre ligne) :
+        // resynchronisation complète immédiate pour recaler l'OF actif et le
+        // produit visualisé de chaque ligne, sans attendre le poll de 15 s.
+        if (previous && previous.ordre_fabrication_id !== message.machine.ordre_fabrication_id) {
+          void load().catch(() => {})
+          return
+        }
+
+        // Les compteurs vivent dans le moteur. React ne se réveille que pour un
+        // changement structurel utile à l'interface (statut ou OF), pas à chaque pièce.
+        if (
+          previous &&
+          previous.statut === message.machine.statut &&
+          previous.ordre_fabrication_id === message.machine.ordre_fabrication_id
+        ) {
+          return
+        }
+        const contexts = cachedSnapshot.contexts.map((context) =>
+          context.line.id !== message.machine!.ligne_production_id
+            ? context
+            : {
+                ...context,
+                machines: context.machines.map((machine) =>
+                  machine.id === message.machine!.id ? message.machine! : machine,
+                ),
+              },
+        )
+        cachedSnapshot = { ...cachedSnapshot, contexts, lastSyncAt: Date.now() }
+        setSnapshot(cachedSnapshot)
+      },
+      (connected) => {
+        if (cancelled || connected === cachedSnapshot.backendOk) return
+        cachedSnapshot = { ...cachedSnapshot, backendOk: connected }
+        setSnapshot(cachedSnapshot)
+      },
+    )
+
+    const timer = window.setInterval(() => void load().catch(() => {}), 15000)
+    return () => {
+      cancelled = true
+      closeSocket()
+      window.clearInterval(timer)
+    }
+  }, [])
+
+  return snapshot
 }

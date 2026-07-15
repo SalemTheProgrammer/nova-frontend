@@ -159,10 +159,45 @@ export interface OrdreFabrication {
   unite: Unite
   statut: StatutOF
   numero_lot_produit: string | null
+  /** Échéance client (jour) : saisie par l'opérateur, jamais écrite par l'ordonnanceur. */
+  date_echeance: string | null
+  /** Créneau calculé par l'ordonnanceur (null tant que Nova n'a appliqué aucune règle). */
+  date_debut_prevue: string | null
   date_fin_prevue: string | null
   ligne_production_id: number | null
   date_creation: string
+  quantite_bonne: string
+  quantite_rejetee: string
   consommations: OFConsommation[]
+}
+
+/** Sort réservé à l'OF interrompu lors d'une préemption de ligne. */
+export type DispositionPreemption = "requeue" | "pause" | "cancel"
+
+export interface OFEnFile {
+  id: number
+  numero: string
+  code_article: string
+  quantite_planifiee: string
+  reste_a_produire: number
+  date_echeance: string | null
+}
+
+export interface OccupationMachine {
+  machine_id: number
+  machine_code: string
+  of_id: number
+  of_numero: string
+  code_article: string
+  reste_a_produire: number
+  date_echeance: string | null
+}
+
+export interface ContexteLigne {
+  ligne_production_id: number
+  machines_libres: number
+  occupations: OccupationMachine[]
+  file_attente: OFEnFile[]
 }
 
 export interface StockMP {
@@ -314,6 +349,13 @@ export interface DowntimeEventRead {
   duree_s: string | null
 }
 
+export interface DowntimePage {
+  items: DowntimeEventRead[]
+  total: number
+  page: number
+  page_size: number
+}
+
 export interface QualityEventRead {
   id: number
   machine_id: number
@@ -459,6 +501,20 @@ export interface LigneScoreArtifact {
   raison: string
 }
 
+export interface SwitchImpactArtifact {
+  of: string
+  article: { id: number; code: string }
+  source: { ligne_id: number | null; machine: string | null; cycle_s: number | null }
+  cible: { ligne_id: number; code: string; machine: string | null; cycle_s: number | null }
+  compatible: boolean
+  faisable: boolean
+  restant: number
+  setup_minutes: number
+  duree_cible_minutes: number | null
+  delta_minutes: number | null
+  blocages: string[]
+}
+
 export interface RisqueMachineArtifact {
   machine_id: number
   code: string
@@ -493,6 +549,17 @@ export interface MatiereConsommee {
   designation_mp: string
   numero_lot: string
   quantite: string
+}
+
+export type PeriodeOEE = "day" | "week" | "month"
+
+export interface PointOEE {
+  label: string
+  horodatage: string
+  disponibilite: string
+  performance: string
+  qualite: string
+  trs: string
 }
 
 export interface DashboardResume {

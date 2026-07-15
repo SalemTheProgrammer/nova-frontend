@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom"
 import { AppShell } from "@/components/layout/AppShell"
 import { WebSocketProvider } from "@/hooks/useWebSocket"
 import type { NavView } from "@/components/Sidebar"
@@ -16,20 +17,47 @@ import { ArticlesPage } from "@/components/dashboard/ArticlesPage"
 import { MatieresPage } from "@/components/dashboard/MatieresPage"
 import { LignesPage } from "@/components/dashboard/LignesPage"
 import { FournisseursPage } from "@/components/dashboard/FournisseursPage"
-import { ConsoleUsinePage } from "@/components/dashboard/ConsoleUsinePage"
+import { SimulateurPage } from "@/components/dashboard/SimulateurPage"
 import { NovaVoicePage } from "@/components/dashboard/NovaVoicePage"
 import { DigitalTwinPage } from "@/components/twin/DigitalTwinPage"
+import { aiChatBus } from "@/lib/aiChatBus"
 
-function App() {
-  const [view, setView] = useState<NavView>("dashboard")
+const NAV_VIEWS: NavView[] = [
+  "dashboard",
+  "machines",
+  "jumeau",
+  "trs",
+  "arrets",
+  "qualite",
+  "maintenance",
+  "stock",
+  "ordres",
+  "articles",
+  "matieres",
+  "lignes",
+  "fournisseurs",
+  "documents",
+  "simulateur",
+  "assistant",
+]
+
+function isNavView(value: string | undefined): value is NavView {
+  return !!value && (NAV_VIEWS as string[]).includes(value)
+}
+
+function AppContent({ view }: { view: NavView }) {
+  const navigate = useNavigate()
+  const setView = (next: NavView) => navigate(`/app/${next}`)
   const [ligneId, setLigneId] = useState<number | null>(null)
   const [docFocus, setDocFocus] = useState<DocumentFocus | null>(null)
   const [aiPanelOpen, setAiPanelOpen] = useState(false)
+  const [twinFullscreen, setTwinFullscreen] = useState(false)
 
   // Le jumeau numérique se pilote via Nova : on ouvre l'assistant à droite
-  // dès qu'on arrive sur cette page.
+  // dès qu'on arrive sur cette page. Quitter la page quitte le plein écran.
   useEffect(() => {
     if (view === "jumeau") setAiPanelOpen(true)
+    else setTwinFullscreen(false)
   }, [view])
 
   /** L'agent a cité des documents : ouvre le viewer PDF sur le premier passage localisable. */
@@ -40,6 +68,13 @@ function App() {
     setView("documents")
   }
 
+  /** Ouvre le panneau Nova et lui envoie directement un message préconstruit
+   * (ex. « Créer avec Nova » sur la page Ordres). */
+  function askNova(message: string) {
+    setAiPanelOpen(true)
+    aiChatBus.emit(message)
+  }
+
   function renderView() {
     switch (view) {
       case "dashboard":
@@ -48,7 +83,15 @@ function App() {
         return <MachinesPage ligneId={ligneId} />
       case "jumeau":
         // Jumeau numérique 3D de la ligne de conditionnement (temps réel).
-        return <DigitalTwinPage ligneId={ligneId} />
+        return (
+          <DigitalTwinPage
+            ligneId={ligneId}
+            onChangeLigne={setLigneId}
+            fullscreen={twinFullscreen}
+            onFullscreenChange={setTwinFullscreen}
+            onAskNova={askNova}
+          />
+        )
       case "trs":
         return <TRSPage ligneId={ligneId} />
       case "arrets":
@@ -60,7 +103,7 @@ function App() {
       case "stock":
         return <StockPage />
       case "ordres":
-        return <OrdresPage />
+        return <OrdresPage onAskNova={askNova} />
       case "articles":
         return <ArticlesPage />
       case "matieres":
@@ -72,8 +115,7 @@ function App() {
       case "documents":
         return <DocumentsPage focus={docFocus} onClearFocus={() => setDocFocus(null)} />
       case "simulateur":
-        // Console usine servie par le backend (flux n8n + pupitre simulateur).
-        return <ConsoleUsinePage />
+        return <SimulateurPage />
       case "assistant":
         // Mode voix plein écran : navigation désactivée (navigationEnabled=false),
         // seule l'instance du panneau latéral pilote les changements de page.
@@ -91,10 +133,27 @@ function App() {
         onDocumentsPassages={handleDocumentsPassages}
         aiPanelOpen={aiPanelOpen}
         onAiPanelOpenChange={setAiPanelOpen}
+        immersive={view === "jumeau" && twinFullscreen}
       >
         {renderView()}
       </AppShell>
     </WebSocketProvider>
+  )
+}
+
+function ViewRoute() {
+  const { view } = useParams<{ view: string }>()
+  if (!isNavView(view)) return <Navigate to="/app/dashboard" replace />
+  return <AppContent view={view} />
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/app/dashboard" replace />} />
+      <Route path="/app/:view" element={<ViewRoute />} />
+      <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
+    </Routes>
   )
 }
 

@@ -119,7 +119,8 @@ function drawVignetteuseHmi(
   ctx.font = `700 ${h * 0.13}px "Geist Variable", Arial`
   ctx.textAlign = "left"
   ctx.textBaseline = "middle"
-  ctx.fillText("VIGNETTEUSE", w * 0.05, h * 0.12)
+  // Le code de la machine MES réellement liée : on voit que la 3D pilote M-xx.
+  ctx.fillText(st.machineCode ? `VIGNETTEUSE · ${st.machineCode}` : "VIGNETTEUSE", w * 0.05, h * 0.12)
 
   const couleur =
     st.statut === "MARCHE" ? "#2dee6e"

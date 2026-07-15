@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react"
 import {
+  Activity,
+  AlertTriangle,
   BookOpen,
   Boxes,
+  ChevronDown,
   ClipboardList,
   Factory,
   FlaskConical,
@@ -9,9 +12,13 @@ import {
   MessageSquare,
   Package,
   PanelLeftClose,
+  PanelLeftOpen,
+  ShieldCheck,
+  SlidersHorizontal,
   Truck,
   Wifi,
   WifiOff,
+  Wrench,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { lignesApi } from "@/lib/api"
@@ -42,28 +49,36 @@ interface NavItem {
   icon: typeof LayoutDashboard
 }
 
-const GROUPES: { titre: string; items: NavItem[] }[] = [
+const GROUPES_PRINCIPAUX: { titre: string; items: NavItem[] }[] = [
   {
-    titre: "Atelier",
+    titre: "Pilotage",
     items: [
       { view: "dashboard", label: "Dashboard", icon: LayoutDashboard },
       { view: "machines", label: "Machines", icon: Factory },
+      { view: "ordres", label: "Ordres de fabrication", icon: ClipboardList },
       { view: "jumeau", label: "Jumeau numérique", icon: Boxes },
       { view: "assistant", label: "Assistant Nova", icon: MessageSquare },
     ],
   },
   {
-    titre: "Gestion",
+    titre: "Analyse",
     items: [
-      { view: "stock", label: "Stock", icon: Package },
-      { view: "ordres", label: "Ordres", icon: ClipboardList },
-      { view: "articles", label: "Articles", icon: Package },
-      { view: "matieres", label: "Matières premières", icon: FlaskConical },
-      { view: "lignes", label: "Lignes", icon: Factory },
-      { view: "fournisseurs", label: "Fournisseurs", icon: Truck },
-      { view: "documents", label: "Documents", icon: BookOpen },
+      { view: "trs", label: "TRS", icon: Activity },
+      { view: "arrets", label: "Arrêts", icon: AlertTriangle },
+      { view: "qualite", label: "Qualité", icon: ShieldCheck },
+      { view: "maintenance", label: "Maintenance", icon: Wrench },
     ],
   },
+]
+
+const RESSOURCES: NavItem[] = [
+  { view: "stock", label: "Stock", icon: Package },
+  { view: "articles", label: "Articles", icon: Package },
+  { view: "matieres", label: "Matières premières", icon: FlaskConical },
+  { view: "lignes", label: "Lignes", icon: Factory },
+  { view: "fournisseurs", label: "Fournisseurs", icon: Truck },
+  { view: "documents", label: "Documents", icon: BookOpen },
+  { view: "simulateur", label: "Simulateur", icon: SlidersHorizontal },
 ]
 
 interface SidebarProps {
@@ -75,84 +90,228 @@ interface SidebarProps {
   onChangeLigne: (id: number | null) => void
 }
 
+function NavigationButton({
+  item,
+  active,
+  onClick,
+}: {
+  item: NavItem
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors",
+        active
+          ? "bg-sidebar-primary font-semibold text-sidebar-primary-foreground shadow-sm"
+          : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60",
+      )}
+    >
+      <item.icon className="size-4 shrink-0" />
+      <span className="truncate">{item.label}</span>
+    </button>
+  )
+}
+
 export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne }: SidebarProps) {
   const [lignes, setLignes] = useState<LigneProduction[]>([])
+  const [resourcesOpen, setResourcesOpen] = useState(() =>
+    RESSOURCES.some((item) => item.view === view),
+  )
   const { connected } = useWebSocket()
 
   useEffect(() => {
     lignesApi.list().then(setLignes).catch(() => {})
   }, [])
 
+  useEffect(() => {
+    if (RESSOURCES.some((item) => item.view === view)) setResourcesOpen(true)
+  }, [view])
+
+  const railItems = GROUPES_PRINCIPAUX.flatMap((group) => group.items)
+
   return (
-    <aside
-      className={cn(
-        "flex h-full flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300",
-        open ? "w-64" : "w-0 overflow-hidden border-r-0",
-      )}
-    >
-      <div className="flex items-center justify-between px-3 py-4">
-        <img src="/r.png" alt="Nova" className="mx-auto h-10" />
+    <>
+      {open && (
         <button
+          type="button"
+          aria-label="Fermer le menu"
           onClick={onToggle}
-          className="rounded-md p-1.5 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-        >
-          <PanelLeftClose className="size-4" />
-        </button>
-      </div>
+          className="fixed inset-0 z-30 bg-black/30 backdrop-blur-[1px] md:hidden"
+        />
+      )}
 
-      <div className="border-b border-sidebar-border px-3 pb-3">
-        <select
-          value={ligneId ?? ""}
-          onChange={(e) => onChangeLigne(e.target.value ? Number(e.target.value) : null)}
-          className="w-full rounded-lg border border-sidebar-border bg-background px-2.5 py-2 text-sm outline-none focus:border-ring"
-        >
-          <option value="">Toutes les lignes</option>
-          {lignes.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.designation}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <nav className="flex-1 space-y-4 overflow-y-auto px-2 py-3">
-        {GROUPES.map((groupe) => (
-          <div key={groupe.titre}>
-            <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-              {groupe.titre}
-            </p>
-            <div className="space-y-0.5">
-              {groupe.items.map((item) => (
-                <button
-                  key={item.view}
-                  onClick={() => onChange(item.view)}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                    view === item.view
-                      ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50",
-                  )}
-                >
-                  <item.icon className="size-4 shrink-0" />
-                  <span className="truncate">{item.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </nav>
-
-      <div className="border-t border-sidebar-border px-3 py-3">
+      <aside
+        className={cn(
+          "group/rail fixed inset-y-0 left-0 z-40 flex h-dvh w-72 shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar shadow-xl",
+          "transition-[width,transform] duration-300 ease-in-out md:relative md:inset-auto md:z-auto md:shadow-none",
+          open ? "translate-x-0 md:w-[17rem]" : "-translate-x-full md:w-16 md:translate-x-0",
+        )}
+      >
         <div
+          aria-hidden={open}
+          inert={open}
           className={cn(
-            "flex items-center gap-1.5 text-xs",
-            connected ? "text-emerald-600 dark:text-emerald-400" : "text-destructive",
+            "absolute inset-0 hidden flex-col items-center py-4 transition-opacity duration-150 md:flex",
+            open ? "pointer-events-none opacity-0" : "opacity-100 delay-150",
           )}
         >
-          {connected ? <Wifi className="size-3.5" /> : <WifiOff className="size-3.5" />}
-          {connected ? "Connecté" : "Déconnecté"}
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label="Afficher le menu"
+            title="Afficher le menu"
+            className="mb-3 flex size-10 shrink-0 items-center justify-center rounded-xl text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+          >
+            <PanelLeftOpen className="size-4" />
+          </button>
+
+          <nav className="flex flex-1 flex-col items-center gap-1 overflow-y-auto px-2">
+            {railItems.map((item) => (
+              <div key={item.view} className="group/item relative">
+                <button
+                  type="button"
+                  onClick={() => onChange(item.view)}
+                  aria-label={item.label}
+                  className={cn(
+                    "flex size-10 items-center justify-center rounded-xl transition-colors",
+                    view === item.view
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                  )}
+                >
+                  <item.icon className="size-4" />
+                </button>
+                <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-neutral-900 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover/item:opacity-100">
+                  {item.label}
+                </span>
+              </div>
+            ))}
+          </nav>
+
+          <div className="mb-1" title={connected ? "Connecté" : "Déconnecté"}>
+            {connected ? (
+              <Wifi className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+            ) : (
+              <WifiOff className="size-3.5 text-destructive" />
+            )}
+          </div>
         </div>
-      </div>
-    </aside>
+
+        <div
+          aria-hidden={!open}
+          inert={!open}
+          className={cn(
+            "absolute inset-0 flex w-72 flex-col transition-opacity duration-150 md:w-[17rem]",
+            open ? "opacity-100 delay-150" : "pointer-events-none opacity-0",
+          )}
+        >
+          <div className="flex h-[4.5rem] items-center justify-between gap-3 border-b border-sidebar-border px-4">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <img src="/favicon.svg" alt="" className="size-9 shrink-0 rounded-xl shadow-sm" />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold tracking-tight">Nova Data</p>
+                <p className="truncate text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
+                  Manufacturing Intelligence
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-label="Réduire le menu"
+              className="rounded-lg p-2 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            >
+              <PanelLeftClose className="size-4" />
+            </button>
+          </div>
+
+          <div className="border-b border-sidebar-border p-3">
+            <label
+              htmlFor="sidebar-ligne"
+              className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+            >
+              <Factory className="size-3" /> Ligne active
+            </label>
+            <select
+              id="sidebar-ligne"
+              value={ligneId ?? ""}
+              onChange={(event) =>
+                onChangeLigne(event.target.value ? Number(event.target.value) : null)
+              }
+              className="h-10 w-full rounded-xl border border-sidebar-border bg-background px-3 text-sm font-medium outline-none transition-shadow focus:border-ring focus:ring-2 focus:ring-ring/15"
+            >
+              <option value="">Vue usine · toutes les lignes</option>
+              {lignes.map((ligne) => (
+                <option key={ligne.id} value={ligne.id}>
+                  {ligne.designation}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
+            {GROUPES_PRINCIPAUX.map((group) => (
+              <div key={group.titre}>
+                <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/40">
+                  {group.titre}
+                </p>
+                <div className="space-y-0.5">
+                  {group.items.map((item) => (
+                    <NavigationButton
+                      key={item.view}
+                      item={item}
+                      active={view === item.view}
+                      onClick={() => onChange(item.view)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            <div>
+              <button
+                type="button"
+                onClick={() => setResourcesOpen((value) => !value)}
+                aria-expanded={resourcesOpen}
+                className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/40 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/70"
+              >
+                Ressources
+                <ChevronDown
+                  className={cn("size-3.5 transition-transform", resourcesOpen && "rotate-180")}
+                />
+              </button>
+              {resourcesOpen && (
+                <div className="mt-1 space-y-0.5">
+                  {RESSOURCES.map((item) => (
+                    <NavigationButton
+                      key={item.view}
+                      item={item}
+                      active={view === item.view}
+                      onClick={() => onChange(item.view)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </nav>
+
+          <div className="border-t border-sidebar-border px-4 py-3">
+            <div
+              className={cn(
+                "flex items-center gap-2 text-xs font-medium",
+                connected ? "text-emerald-600 dark:text-emerald-400" : "text-destructive",
+              )}
+            >
+              {connected ? <Wifi className="size-3.5" /> : <WifiOff className="size-3.5" />}
+              {connected ? "Temps réel actif" : "Connexion interrompue"}
+            </div>
+          </div>
+        </div>
+      </aside>
+    </>
   )
 }

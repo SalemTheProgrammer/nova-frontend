@@ -1,5 +1,6 @@
-import { useCallback, useRef, useState } from "react"
-import { streamChatMessage } from "@/lib/api"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { getChatHistory, streamChatMessage } from "@/lib/api"
+import { chatSession } from "@/lib/chatSession"
 import type { AgentArtifact, AgentStreamEvent } from "@/lib/types"
 
 /** Un segment d'une réponse de l'agent : texte streamé ou étape d'outil. */
@@ -37,7 +38,27 @@ export function useAgentChat(
 ) {
   const [turns, setTurns] = useState<AgentTurn[]>([])
   const [loading, setLoading] = useState(false)
-  const threadId = useRef<string | undefined>(undefined)
+  const threadId = useRef<string | undefined>(chatSession.threadId)
+
+  // Réhydrate la conversation après un refresh de page : le thread_id
+  // survit dans localStorage, l'historique des messages survit côté backend
+  // (checkpointer SQLite — voir backend/app/agent/graph.py).
+  useEffect(() => {
+    const savedThreadId = threadId.current
+    if (!savedThreadId) return
+    let cancelled = false
+    getChatHistory(savedThreadId)
+      .then((r) => {
+        if (!cancelled && r.turns.length > 0) setTurns(r.turns)
+      })
+      .catch(() => {
+        // Thread introuvable/expiré : on repart d'une conversation vide.
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const send = useCallback(
     async (text: string, mode: "texte" | "voix" = "texte") => {
@@ -96,6 +117,7 @@ export function useAgentChat(
             break
           case "done":
             threadId.current = event.thread_id
+            chatSession.setThreadId(event.thread_id)
             if (event.response) onFinal?.(event.response)
             break
           case "error":

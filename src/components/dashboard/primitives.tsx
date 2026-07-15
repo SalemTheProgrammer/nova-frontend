@@ -8,21 +8,23 @@ export function Page({
   actions,
   children,
   fullHeight = false,
+  className,
 }: {
   title?: string
   description?: string
   actions?: ReactNode
   children: ReactNode
   fullHeight?: boolean
+  className?: string
 }) {
   const hasHeader = Boolean(title) || Boolean(actions)
   if (fullHeight) {
     return (
-      <div className="flex h-full flex-col overflow-hidden px-5 pb-4 pt-4">
+      <div className={cn("flex h-full min-w-0 flex-col overflow-hidden p-3 sm:p-4 xl:p-6", className)}>
         {hasHeader && (
-          <div className="mb-3 flex shrink-0 items-center justify-between gap-4">
-            <div className="flex items-baseline gap-3">
-              {title && <h1 className="text-lg font-semibold tracking-tight">{title}</h1>}
+          <div className="page-header mb-3 flex shrink-0 items-center justify-between gap-3">
+            <div className="min-w-0 sm:flex sm:items-baseline sm:gap-3">
+              {title && <h1 className="truncate text-lg font-semibold tracking-tight">{title}</h1>}
               {description && (
                 <p className="hidden text-sm text-muted-foreground md:block">{description}</p>
               )}
@@ -35,7 +37,7 @@ export function Page({
     )
   }
   return (
-    <div className="w-full px-6 py-6">
+    <div className="w-full min-w-0 px-3 py-4 sm:px-4 lg:px-6 lg:py-6">
       {hasHeader && (
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>

@@ -28,7 +28,7 @@ export function BoxMesh({
       position={p}
       rotation={r}
       material={m}
-      castShadow={!noShadow}
+      castShadow={false}
       receiveShadow={!noShadow}
     >
       <boxGeometry args={s} />
@@ -61,7 +61,7 @@ export function CylMesh({
       position={p}
       rotation={r}
       material={m}
-      castShadow={!noShadow}
+      castShadow={false}
       receiveShadow={!noShadow}
     >
       <cylinderGeometry args={[radiusTop ?? radius, radius, h, seg]} />

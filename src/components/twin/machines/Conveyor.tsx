@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import { useFrame } from "@react-three/fiber"
 import * as THREE from "three"
 import { BELT_SPEED, BELT_Y, type StationId, type TwinEngine } from "../simulation"
@@ -41,6 +41,14 @@ export function Conveyor({
     const tex = beltTexture(length * 3)
     return new THREE.MeshStandardMaterial({ map: tex, color: "#ffffff", roughness: 0.9, metalness: 0 })
   }, [length])
+
+  useEffect(
+    () => () => {
+      beltMat.map?.dispose()
+      beltMat.dispose()
+    },
+    [beltMat],
+  )
 
   useFrame((_, dt) => {
     if (engine.isRunning(station) && beltMat.map) {

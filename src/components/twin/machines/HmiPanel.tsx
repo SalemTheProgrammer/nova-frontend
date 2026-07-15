@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { useFrame } from "@react-three/fiber"
 import * as THREE from "three"
 import { M, screenMaterial } from "../materials"
@@ -7,7 +7,7 @@ import { BoxMesh, CylMesh, type V3 } from "./prims"
 export type HmiDraw = (ctx: CanvasRenderingContext2D, w: number, h: number) => void
 
 /**
- * Écran vivant : plan dont la texture canvas est redessinée ~4 fois/s par le
+ * Écran vivant : plan dont la texture canvas est redessinée ~2 fois/s par le
  * callback `draw` — utilisé pour les pupitres HMI et l'afficheur de pesée.
  */
 export function LiveScreen({
@@ -35,9 +35,17 @@ export function LiveScreen({
     return { mat: screenMaterial(tex), canvas, tex }
   }, [w, h, px])
 
-  const last = useRef(0)
+  useEffect(
+    () => () => {
+      mat.dispose()
+      tex.dispose()
+    },
+    [mat, tex],
+  )
+
+  const last = useRef(Number.NEGATIVE_INFINITY)
   useFrame(({ clock }) => {
-    if (clock.elapsedTime - last.current < 0.25) return
+    if (clock.elapsedTime - last.current < 0.5) return
     last.current = clock.elapsedTime
     const ctx = canvas.getContext("2d")
     if (!ctx) return

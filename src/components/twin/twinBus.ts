@@ -1,32 +1,21 @@
 /**
  * Canal de commandes « Nova → Jumeau numérique ».
  *
- * Le jumeau n'a plus de pupitre de réglages manuels : c'est l'assistant Nova qui
- * le pilote. Quand un outil de l'agent renvoie un artifact `twin_command`, le
- * panneau IA (toujours monté) l'émet ici ; la page du jumeau (montée seulement
- * quand on la regarde) s'abonne et applique la commande au moteur de simulation.
+ * Le jumeau est un miroir temps réel du MES : Nova ne pilote plus la ligne à
+ * travers lui, seulement son AFFICHAGE (caméra, annotations). Quand un outil de
+ * l'agent renvoie un artifact `twin_command`, le panneau IA (toujours monté)
+ * l'émet ici ; la page du jumeau (montée seulement quand on la regarde)
+ * s'abonne et applique la commande.
  *
  * Comme Nova ouvre souvent la page du jumeau ET envoie la commande dans le même
  * flux, la commande peut arriver AVANT que la page ne soit montée : on tamponne
  * alors les commandes en attente et on les rejoue dès qu'un handler s'abonne.
  */
 export interface TwinCommand {
-  action:
-    | "demarrer"
-    | "pause"
-    | "arreter"
-    | "panne"
-    | "resoudre"
-    | "vitesse"
-    | "cadence"
-    | "defauts"
-    | "publier"
-    | "annotations"
-    | "vue"
-    | "reset"
-  /** Poste ciblé ('blistereuse' | 'trieuse' | 'vignetteuse' | 'tout') ou préréglage caméra. */
+  action: "vue" | "annotations" | "ligne"
+  /** Préréglage caméra ('ensemble' | 'blistereuse' | 'trieuse' | 'vignetteuse' | 'rejets'). */
   cible?: string
-  /** Valeur numérique (vitesse, cadence, fraction de défauts) ou booléen (publier/annotations). */
+  /** Booléen d'affichage (annotations on/off). Pour `ligne`, cible contient le code, l'id ou le nom. */
   valeur?: number | boolean
 }
 

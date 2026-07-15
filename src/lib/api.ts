@@ -2,9 +2,12 @@ import type {
   AgentProposal,
   AgentStreamEvent,
   Article,
+  CauseArret,
   CauseRebut,
+  ContexteLigne,
   DashboardResume,
-  DowntimeEventRead,
+  DispositionPreemption,
+  DowntimePage,
   Faisabilite,
   Fournisseur,
   LigneProduction,
@@ -22,6 +25,8 @@ import type {
   Mouvement,
   Nomenclature,
   OrdreFabrication,
+  PeriodeOEE,
+  PointOEE,
   QualiteResume,
   QualityEventRead,
   StatutLot,
@@ -33,11 +38,6 @@ import type {
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api/v1"
 const API_KEY = import.meta.env.VITE_API_KEY ?? "dev-local-key"
-
-/** Origine du backend FastAPI — sert aussi la console simulateur en HTML (`/simulateur`). */
-export const BACKEND_ORIGIN = import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8000"
-export const SIMULATOR_CONSOLE_URL = `${BACKEND_ORIGIN}/simulateur`
-
 
 export interface ApiError {
   error: { code: string; message: string; details?: Record<string, unknown> }
@@ -141,6 +141,14 @@ export async function streamChatMessage(
       }
     }
   }
+}
+
+/** Relit l'historique d'un thread (pour réhydrater le panneau de chat après un
+ * refresh de page — voir useAgentChat.ts et chatSession.ts). */
+export function getChatHistory(threadId: string) {
+  return api.get<{ thread_id: string; turns: import("@/hooks/useAgentChat").AgentTurn[] }>(
+    `/chat/${encodeURIComponent(threadId)}/history`,
+  )
 }
 
 // --------------------------- Superviseur autonome --------------------------- //
@@ -286,11 +294,29 @@ export const ordresApi = {
   create: (data: {
     article_id: number
     quantite: number
-    date_fin_prevue?: string | null
+    date_echeance?: string | null
     ligne_production_id?: number | null
   }) => api.post<OrdreFabrication>("/ordres-fabrication", data),
   setStatut: (id: number, statut: StatutOF) =>
     api.patch<OrdreFabrication>(`/ordres-fabrication/${id}/statut`, { statut }),
+  setLigne: (id: number, ligneProductionId: number | null) =>
+    api.patch<OrdreFabrication>(`/ordres-fabrication/${id}/ligne`, {
+      ligne_production_id: ligneProductionId,
+    }),
+  /** État d'occupation d'une ligne : OF en cours, file d'attente (EDD), place libre. */
+  contexteLigne: (ligneId: number) =>
+    api.get<ContexteLigne>(`/ordres-fabrication/lignes/${ligneId}/contexte`),
+  /** Lance un OF sur sa ligne ; préempte l'OF en cours si `disposition` fourni.
+   * Sans machine libre et sans disposition → 409 (l'appelant propose préemption/file). */
+  lancer: (id: number, disposition?: DispositionPreemption) =>
+    api.post<OrdreFabrication>(`/ordres-fabrication/${id}/lancer`, {
+      preempt_disposition: disposition ?? null,
+    }),
+  /** Met l'OF en file d'attente sur une ligne (PLANIFIE, sans démarrage). */
+  mettreEnFile: (id: number, ligneProductionId: number) =>
+    api.post<OrdreFabrication>(`/ordres-fabrication/${id}/mettre-en-file`, {
+      ligne_production_id: ligneProductionId,
+    }),
 }
 
 // --------------------------- Base documentaire (RAG) --------------------------- //
@@ -379,12 +405,26 @@ export const simulatorApi = {
 
 // --------------------------- Arrêts --------------------------- //
 export const downtimeApi = {
-  list: (params?: { machineId?: number; actifsSeulement?: boolean }) => {
+  list: (params?: {
+    machineId?: number
+    cause?: CauseArret
+    actifsSeulement?: boolean
+    resolusSeulement?: boolean
+    dateDebut?: string
+    dateFin?: string
+    page?: number
+    pageSize?: number
+  }) => {
     const qs = new URLSearchParams()
     if (params?.machineId) qs.set("machine_id", String(params.machineId))
+    if (params?.cause) qs.set("cause", params.cause)
     if (params?.actifsSeulement) qs.set("actifs_seulement", "true")
-    const query = qs.toString()
-    return api.get<DowntimeEventRead[]>(`/arrets${query ? `?${query}` : ""}`)
+    if (params?.resolusSeulement) qs.set("resolus_seulement", "true")
+    if (params?.dateDebut) qs.set("date_debut", params.dateDebut)
+    if (params?.dateFin) qs.set("date_fin", params.dateFin)
+    qs.set("page", String(params?.page ?? 1))
+    qs.set("page_size", String(params?.pageSize ?? 5))
+    return api.get<DowntimePage>(`/arrets?${qs.toString()}`)
   },
 }
 
@@ -406,12 +446,25 @@ export const maintenanceApi = {
 
 // --------------------------- KPI / TRS / Dashboard --------------------------- //
 export const kpiApi = {
-  trs: (scope: "machine" | "ligne" | "of", id: number) =>
-    api.get<TRSRead>(`/kpi/trs?scope=${scope}&id=${id}`),
+  trs: (
+    scope: "machine" | "ligne" | "of",
+    id: number,
+    opts?: { debut?: string; fin?: string },
+  ) => {
+    const qs = new URLSearchParams({ scope, id: String(id) })
+    if (opts?.debut) qs.set("debut", opts.debut)
+    if (opts?.fin) qs.set("fin", opts.fin)
+    return api.get<TRSRead>(`/kpi/trs?${qs.toString()}`)
+  },
   dashboard: (ligneId?: number | null) =>
     api.get<DashboardResume>(
       `/dashboard/resume${ligneId != null ? `?ligne_id=${ligneId}` : ""}`,
     ),
+  oeeHistory: (ligneId: number | null | undefined, periode: PeriodeOEE) => {
+    const qs = new URLSearchParams({ periode })
+    if (ligneId != null) qs.set("ligne_id", String(ligneId))
+    return api.get<PointOEE[]>(`/kpi/oee-history?${qs.toString()}`)
+  },
 }
 
 // --------------------------- AI panel --------------------------- //

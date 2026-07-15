@@ -172,5 +172,7 @@ function drawWeightScreen(
 
   const st = engine.stations.trieuse
   ctx.fillStyle = "#c9d8f2"
-  ctx.fillText(`OK ${st.bonne}   NOK ${st.rebut}`, w / 2, h * 0.92)
+  // Compteurs réels de la machine MES liée (le code M-xx prouve la liaison).
+  const prefixe = st.machineCode ? `${st.machineCode}  ·  ` : ""
+  ctx.fillText(`${prefixe}OK ${st.bonne}   NOK ${st.rebut}`, w / 2, h * 0.92)
 }

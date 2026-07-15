@@ -171,7 +171,8 @@ function drawBlisterHmi(
   ctx.font = `700 ${h * 0.14}px "Geist Variable", Arial`
   ctx.textAlign = "left"
   ctx.textBaseline = "middle"
-  ctx.fillText("BLISTÉREUSE", w * 0.05, h * 0.12)
+  // Le code de la machine MES réellement liée : on voit que la 3D pilote M-xx.
+  ctx.fillText(st.machineCode ? `BLISTÉREUSE · ${st.machineCode}` : "BLISTÉREUSE", w * 0.05, h * 0.12)
 
   const couleur =
     st.statut === "MARCHE" ? "#2dee6e"
