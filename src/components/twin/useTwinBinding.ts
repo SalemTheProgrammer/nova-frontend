@@ -181,8 +181,10 @@ export function useTwinBinding(): FleetSnapshot {
           const machines = allMachines.filter((machine) => machine.ligne_production_id === line.id)
           const engine = twinEngineForLine(line.id)
           const activeOrder = activeOrderForLine(line.id, machines, orders)
+          const activeMachineId =
+            machines.find((machine) => machine.ordre_fabrication_id === activeOrder?.id)?.id ?? null
           bindLineMachines(engine, machines)
-          engine.setActiveOrder(activeOrder?.id ?? null)
+          engine.setActiveOrder(activeOrder?.id ?? null, activeMachineId)
           for (const machine of machines) applyMachine(machine, !knownProduction.has(machine.id))
           engine.syncVirtualStations()
           return {

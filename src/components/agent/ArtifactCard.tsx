@@ -26,6 +26,7 @@ import type {
   AgentArtifact,
   BesoinArtifact,
   LigneScoreArtifact,
+  OrdreListeItem,
   RisqueMachineArtifact,
   SwitchImpactArtifact,
 } from "@/lib/types"
@@ -51,6 +52,8 @@ export function ArtifactCard({
       return <FaisabiliteCard artifact={artifact} />
     case "of_cree":
       return <OFCreeCard artifact={artifact} />
+    case "ordres_liste":
+      return <OrdresListeCard artifact={artifact} />
     case "documents":
       return <DocumentsCard artifact={artifact} />
     case "trs":
@@ -273,6 +276,71 @@ function OFCreeCard({ artifact }: { artifact: AgentArtifact }) {
         )}
       </div>
     </Shell>
+  )
+}
+
+const STATUT_TONES: Record<string, string> = {
+  BROUILLON: "bg-muted text-muted-foreground",
+  PLANIFIE: "bg-sky-500/15 text-sky-700 dark:text-sky-400",
+  EN_COURS: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  TERMINE: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  ANNULE: "bg-destructive/15 text-destructive",
+}
+
+function OrdresListeCard({ artifact }: { artifact: AgentArtifact }) {
+  const ordres = (artifact.ordres as OrdreListeItem[] | undefined) ?? []
+  return (
+    <div className="overflow-hidden rounded-xl bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+      <div className="flex items-center justify-between gap-3 bg-neutral-950 px-4 py-3 text-white dark:bg-black">
+        <div className="flex items-center gap-2">
+          <ClipboardList className="size-4" />
+          <span className="text-sm font-semibold">Ordres de fabrication</span>
+        </div>
+        <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold">
+          {ordres.length} OF
+        </span>
+      </div>
+
+      <div className="max-h-96 overflow-y-auto">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-card">
+            <tr className="text-left text-muted-foreground">
+              <th className="border-b border-border/60 px-4 py-2 font-medium">OF</th>
+              <th className="border-b border-border/60 px-2 py-2 font-medium">Article</th>
+              <th className="border-b border-border/60 px-2 py-2 text-right font-medium">Quantité</th>
+              <th className="border-b border-border/60 px-4 py-2 text-right font-medium">Statut</th>
+            </tr>
+          </thead>
+          <tbody className="tabular-nums">
+            {ordres.map((of) => (
+              <tr key={of.numero} className="border-t border-border/60 hover:bg-neutral-100/80 dark:hover:bg-neutral-900/70">
+                <td className="px-4 py-2 font-mono font-semibold">{of.numero}</td>
+                <td className="px-2 py-2">
+                  <span className="font-medium">{of.article_code}</span>
+                  <span className="ml-1 hidden text-muted-foreground sm:inline">{of.article_designation}</span>
+                </td>
+                <td className="px-2 py-2 text-right">
+                  {of.quantite} <span className="text-muted-foreground">{of.unite}</span>
+                </td>
+                <td className="px-4 py-2 text-right">
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                      STATUT_TONES[of.statut] ?? "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {of.statut}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {ordres.length === 0 && (
+          <div className="px-4 py-8 text-center text-xs text-muted-foreground">Aucun OF à afficher.</div>
+        )}
+      </div>
+    </div>
   )
 }
 

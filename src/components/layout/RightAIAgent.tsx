@@ -19,6 +19,7 @@ import { useProposals } from "@/hooks/useProposals"
 import { useVoice } from "@/hooks/useVoice"
 import { useWebSocket } from "@/hooks/useWebSocket"
 import { AgentTurnView } from "@/components/agent/AgentMessage"
+import { AutonomyToggle } from "@/components/agent/AutonomyToggle"
 import { ProposalCard } from "@/components/agent/ProposalCard"
 import type { NavView } from "@/components/Sidebar"
 import type { DocumentPassage } from "@/lib/types"
@@ -109,7 +110,7 @@ export function RightAIAgent({
       }
     },
   )
-  const { pending, applyDecision } = useProposals()
+  const { pending, recentDecided, applyDecision } = useProposals()
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   // Permet à une autre page (ex. « Créer avec Nova » sur Ordres) de préremplir
@@ -241,12 +242,25 @@ export function RightAIAgent({
       </div>
 
       {activeTab === "decisions" ? (
-        <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3">
-          {pending.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Aucune décision en attente.</p>
-          ) : (
-            pending.map((p) => <ProposalCard key={p.id} proposal={p} onDecided={applyDecision} />)
-          )}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <AutonomyToggle />
+          <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3">
+            {pending.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Aucune décision en attente.</p>
+            ) : (
+              pending.map((p) => <ProposalCard key={p.id} proposal={p} onDecided={applyDecision} />)
+            )}
+            {recentDecided.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Décisions récentes
+                </p>
+                {recentDecided.map((p) => (
+                  <ProposalCard key={p.id} proposal={p} compact />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <>
@@ -291,9 +305,13 @@ export function RightAIAgent({
               <AgentTurnView key={turn.id} turn={turn} onQuickReply={(text) => void send(text)} />
             ))}
             {loading && turns[turns.length - 1]?.segments.length === 0 && (
-              <div className="flex items-center gap-2 pl-10 text-xs text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" />
-                Nova analyse…
+              <div className="flex items-center gap-1.5 pl-10 text-xs text-muted-foreground">
+                <span>Nova réfléchit</span>
+                <span className="flex items-center gap-0.5">
+                  <span className="size-1 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
+                  <span className="size-1 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
+                  <span className="size-1 animate-bounce rounded-full bg-current" />
+                </span>
               </div>
             )}
           </div>
@@ -305,45 +323,47 @@ export function RightAIAgent({
                 <Loader2 className="size-3 animate-spin" /> Transcription en cours…
               </p>
             )}
-            <form onSubmit={handleSubmit} className="relative">
+            <form
+              onSubmit={handleSubmit}
+              className={cn(
+                "flex items-center gap-2 rounded-2xl border border-input bg-background py-1.5 pl-3.5 pr-1.5",
+                "transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20",
+                voice.recording && "border-destructive/60 ring-2 ring-destructive/20",
+              )}
+            >
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={voice.recording ? "Parlez, je vous écoute…" : "Question à Nova…"}
                 rows={1}
-                className={cn(
-                  "field-sizing-content max-h-32 w-full resize-none rounded-xl border border-input bg-background py-2.5 pl-3 pr-[4.25rem] text-sm",
-                  "outline-none transition-colors placeholder:text-muted-foreground",
-                  "focus:border-ring focus:ring-2 focus:ring-ring/20",
-                  voice.recording && "border-destructive/60 ring-2 ring-destructive/20",
-                )}
+                className="field-sizing-content max-h-32 flex-1 resize-none bg-transparent py-1 text-sm outline-none placeholder:text-muted-foreground"
               />
-              <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-1">
+              <div className="flex shrink-0 items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => (voice.recording ? voice.stopRecording() : void voice.startRecording())}
                   title={voice.recording ? "Terminer et envoyer" : "Parler à Nova"}
                   className={cn(
-                    "flex size-7 items-center justify-center rounded-lg transition-colors",
+                    "flex size-8 items-center justify-center rounded-full transition-all duration-150",
                     voice.recording
-                      ? "animate-pulse bg-destructive text-white"
-                      : "bg-muted text-muted-foreground hover:bg-accent hover:text-foreground",
+                      ? "animate-pulse bg-destructive text-white shadow-sm shadow-destructive/40"
+                      : "bg-foreground text-background hover:scale-105 hover:bg-foreground/85",
                   )}
                 >
-                  {voice.recording ? <Square className="size-3" /> : <Mic className="size-3.5" />}
+                  {voice.recording ? <Square className="size-3.5" /> : <Mic className="size-4" />}
                 </button>
                 <button
                   type="submit"
                   disabled={loading || !input.trim()}
                   className={cn(
-                    "flex size-7 items-center justify-center rounded-lg transition-colors",
+                    "flex size-8 items-center justify-center rounded-full transition-all duration-150",
                     input.trim()
-                      ? "bg-primary text-primary-foreground hover:bg-primary/80"
-                      : "bg-muted text-muted-foreground",
+                      ? "bg-foreground text-background shadow-sm shadow-foreground/30 hover:scale-105 hover:bg-foreground/85"
+                      : "bg-foreground/15 text-foreground/40",
                   )}
                 >
-                  {loading ? <Loader2 className="size-3.5 animate-spin" /> : <ArrowUp className="size-3.5" />}
+                  {loading ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
                 </button>
               </div>
             </form>

@@ -2,6 +2,8 @@ import type {
   AgentProposal,
   AgentStreamEvent,
   Article,
+  AutonomyMode,
+  AutonomySettings,
   CauseArret,
   CauseRebut,
   ContexteLigne,
@@ -39,6 +41,50 @@ import type {
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api/v1"
 const API_KEY = import.meta.env.VITE_API_KEY ?? "dev-local-key"
 
+// --------------------------- Jeton de session utilisateur --------------------------- //
+const TOKEN_KEY = "nova_token"
+const USER_KEY = "nova_user"
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY)
+}
+
+export function storeSession(token: string, user: User): void {
+  localStorage.setItem(TOKEN_KEY, token)
+  localStorage.setItem(USER_KEY, JSON.stringify(user))
+}
+
+export function getStoredUser(): User | null {
+  const raw = localStorage.getItem(USER_KEY)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as User
+  } catch {
+    return null
+  }
+}
+
+export function clearSession(): void {
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+/** 401 sur une session existante = jeton expiré/invalide → déconnexion + retour login.
+ * (Pas de redirection quand aucun jeton n'est stocké : ex. code de connexion erroné.) */
+function handleUnauthorized(status: number): void {
+  if (status === 401 && getToken()) {
+    clearSession()
+    if (!window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login"
+    }
+  }
+}
+
 export interface ApiError {
   error: { code: string; message: string; details?: Record<string, unknown> }
 }
@@ -53,11 +99,13 @@ async function request<T>(
     headers: {
       "Content-Type": "application/json",
       "X-API-Key": API_KEY,
+      ...authHeaders(),
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
 
   if (!res.ok) {
+    handleUnauthorized(res.status)
     let message = `Requête échouée (${res.status})`
     try {
       const data = (await res.json()) as ApiError & { detail?: string }
@@ -75,10 +123,12 @@ async function request<T>(
 async function upload<T>(path: string, formData: FormData): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: { "X-API-Key": API_KEY }, // no Content-Type: browser sets multipart boundary
+    // no Content-Type: browser sets multipart boundary
+    headers: { "X-API-Key": API_KEY, ...authHeaders() },
     body: formData,
   })
   if (!res.ok) {
+    handleUnauthorized(res.status)
     let message = `Requête échouée (${res.status})`
     try {
       const data = (await res.json()) as ApiError & { detail?: string }
@@ -114,11 +164,12 @@ export async function streamChatMessage(
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/chat/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+    headers: { "Content-Type": "application/json", "X-API-Key": API_KEY, ...authHeaders() },
     body: JSON.stringify({ message, mode, ...(threadId ? { thread_id: threadId } : {}) }),
     signal,
   })
   if (!res.ok || !res.body) {
+    handleUnauthorized(res.status)
     throw new Error(`Le flux agent a échoué (${res.status})`)
   }
 
@@ -159,6 +210,9 @@ export const agentApi = {
     ),
   approuver: (id: number) => api.post<AgentProposal>(`/agent/propositions/${id}/approuver`),
   rejeter: (id: number) => api.post<AgentProposal>(`/agent/propositions/${id}/rejeter`),
+  autonomie: () => api.get<AutonomySettings>("/agent/autonomie"),
+  definirAutonomie: (mode: AutonomyMode) =>
+    api.post<AutonomySettings>("/agent/autonomie", { mode }),
 }
 
 // --------------------------- Voix (OpenAI) --------------------------- //
@@ -172,7 +226,7 @@ export const voiceApi = {
   speak: async (text: string): Promise<Blob> => {
     const res = await fetch(`${API_BASE}/voice/speak`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+      headers: { "Content-Type": "application/json", "X-API-Key": API_KEY, ...authHeaders() },
       body: JSON.stringify({ text }),
     })
     if (!res.ok) throw new Error(`Synthèse vocale échouée (${res.status})`)
@@ -335,7 +389,7 @@ export const documentsApi = {
   /** PDF source d'un document, récupéré en blob (l'en-tête X-API-Key est requis). */
   pdfBlob: async (id: number): Promise<Blob> => {
     const res = await fetch(`${API_BASE}/documents/${id}/pdf`, {
-      headers: { "X-API-Key": API_KEY },
+      headers: { "X-API-Key": API_KEY, ...authHeaders() },
     })
     if (!res.ok) {
       let message = `PDF indisponible (${res.status})`
@@ -470,4 +524,40 @@ export const kpiApi = {
 // --------------------------- AI panel --------------------------- //
 export const aiApi = {
   insights: () => api.get<{ insights: string[] }>("/ai/insights"),
+}
+
+// --------------------------- Authentification / utilisateurs --------------------------- //
+export interface User {
+  id: number
+  telephone: string
+  nom_complet: string
+  is_admin: boolean
+  actif: boolean
+  outils_autorises: string[]
+}
+
+export interface ToolCatalogItem {
+  name: string
+  categorie: string
+  description: string
+}
+
+export const authApi = {
+  requestCode: (telephone: string) =>
+    api.post<{ sent: boolean; dev_code?: string | null }>("/auth/request-code", { telephone }),
+  verifyCode: (telephone: string, code: string) =>
+    api.post<{ token: string; user: User }>("/auth/verify-code", { telephone, code }),
+  me: () => api.get<User>("/auth/me"),
+}
+
+export const adminApi = {
+  users: () => api.get<User[]>("/admin/users"),
+  tools: () => api.get<ToolCatalogItem[]>("/admin/tools"),
+  createUser: (data: { telephone: string; nom_complet: string; outils_autorises: string[] }) =>
+    api.post<User>("/admin/users", data),
+  updateUser: (
+    id: number,
+    data: Partial<{ nom_complet: string; actif: boolean; outils_autorises: string[] }>,
+  ) => api.patch<User>(`/admin/users/${id}`, data),
+  deleteUser: (id: number) => api.del(`/admin/users/${id}`),
 }

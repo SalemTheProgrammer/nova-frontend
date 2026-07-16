@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import {
   Activity,
   AlertTriangle,
@@ -9,6 +10,7 @@ import {
   Factory,
   FlaskConical,
   LayoutDashboard,
+  LogOut,
   MessageSquare,
   Package,
   PanelLeftClose,
@@ -16,6 +18,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Truck,
+  UserCog,
   Wifi,
   WifiOff,
   Wrench,
@@ -24,6 +27,7 @@ import { cn } from "@/lib/utils"
 import { lignesApi } from "@/lib/api"
 import type { LigneProduction } from "@/lib/types"
 import { useWebSocket } from "@/hooks/useWebSocket"
+import { useAuth } from "@/lib/auth"
 
 export type NavView =
   | "dashboard"
@@ -122,6 +126,8 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
     RESSOURCES.some((item) => item.view === view),
   )
   const { connected } = useWebSocket()
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
 
   useEffect(() => {
     lignesApi.list().then(setLignes).catch(() => {})
@@ -192,12 +198,36 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
             ))}
           </nav>
 
-          <div className="mb-1" title={connected ? "Connecté" : "Déconnecté"}>
-            {connected ? (
-              <Wifi className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-            ) : (
-              <WifiOff className="size-3.5 text-destructive" />
+          <div className="flex flex-col items-center gap-1">
+            {user?.is_admin && (
+              <button
+                type="button"
+                onClick={() => navigate("/admin")}
+                aria-label="Administration"
+                title="Administration"
+                className="flex size-10 items-center justify-center rounded-xl text-violet-600 transition-colors hover:bg-sidebar-accent/60 dark:text-violet-400"
+              >
+                <UserCog className="size-4" />
+              </button>
             )}
+            {user && (
+              <button
+                type="button"
+                onClick={logout}
+                aria-label="Déconnexion"
+                title="Déconnexion"
+                className="flex size-10 items-center justify-center rounded-xl text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+              >
+                <LogOut className="size-4" />
+              </button>
+            )}
+            <div className="my-1" title={connected ? "Connecté" : "Déconnecté"}>
+              {connected ? (
+                <Wifi className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <WifiOff className="size-3.5 text-destructive" />
+              )}
+            </div>
           </div>
         </div>
 
@@ -299,7 +329,7 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
             </div>
           </nav>
 
-          <div className="border-t border-sidebar-border px-4 py-3">
+          <div className="space-y-2 border-t border-sidebar-border px-4 py-3">
             <div
               className={cn(
                 "flex items-center gap-2 text-xs font-medium",
@@ -309,6 +339,35 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
               {connected ? <Wifi className="size-3.5" /> : <WifiOff className="size-3.5" />}
               {connected ? "Temps réel actif" : "Connexion interrompue"}
             </div>
+
+            {user && (
+              <div className="rounded-xl border border-sidebar-border bg-sidebar-accent/40 p-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">
+                    {user.nom_complet || "Utilisateur"}
+                  </p>
+                  <p className="truncate text-[11px] text-muted-foreground">{user.telephone}</p>
+                </div>
+                <div className="mt-2 flex items-center gap-1.5">
+                  {user.is_admin && (
+                    <button
+                      type="button"
+                      onClick={() => navigate("/admin")}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-violet-600 px-2 py-1.5 text-xs font-medium text-white transition-colors hover:bg-violet-700"
+                    >
+                      <UserCog className="size-3.5" /> Admin
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={logout}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-sidebar-border px-2 py-1.5 text-xs font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent"
+                  >
+                    <LogOut className="size-3.5" /> Déconnexion
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </aside>

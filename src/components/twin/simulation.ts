@@ -185,6 +185,15 @@ export class TwinEngine {
   /** OF réellement monté sur la ligne. Sans OF actif, aucune animation métier. */
   activeOrderId: number | null = null
 
+  /**
+   * Machine qui porte réellement l'OF actif (celle dont `ordre_fabrication_id`
+   * correspond). Les machines d'une même ligne sont des ressources INDÉPENDANTES
+   * (voir `machine_libre_sur_ligne` côté backend) : chacune produit entièrement
+   * son propre OF. Le convoyeur visuel ne doit donc pas s'arrêter parce qu'une
+   * autre machine de la ligne (sans rapport avec cet OF) est à l'arrêt.
+   */
+  activeMachineId: number | null = null
+
   /** Produits à faire apparaître, poussés par les productions réelles du MES. */
   private pendingSpawns = 0
 
@@ -247,10 +256,14 @@ export class TwinEngine {
   /**
    * Change le contexte produit. Les pièces de l'ancien OF sont retirées pour
    * éviter qu'elles changent visuellement d'article au milieu de la ligne.
+   * `machineId` identifie la machine qui porte réellement cet OF (celle dont
+   * `ordre_fabrication_id` correspond) — c'est elle qui fait foi pour savoir si
+   * le convoyeur avance, pas les autres machines de la ligne.
    */
-  setActiveOrder(orderId: number | null) {
-    if (this.activeOrderId === orderId) return
+  setActiveOrder(orderId: number | null, machineId: number | null = null) {
+    if (this.activeOrderId === orderId && this.activeMachineId === machineId) return
     this.activeOrderId = orderId
+    this.activeMachineId = machineId
     this.products.length = 0
     this.pendingSpawns = 0
     this.completedUnits = 0
@@ -260,26 +273,41 @@ export class TwinEngine {
   }
 
   /**
-   * Une ligne est réellement en production si un OF est monté et si toutes
-   * les machines MES qui la composent sont en marche. Les postes 3D sans
-   * machine propre héritent de cet état via `syncVirtualStations`.
+   * Statut de référence du convoyeur pour l'OF actuellement visualisé.
+   *
+   * Les machines d'une même ligne sont des ressources INDÉPENDANTES (chacune
+   * produit entièrement son propre OF, voir `machine_libre_sur_ligne` côté
+   * backend) : le convoyeur ne doit donc suivre QUE la machine qui porte
+   * réellement l'OF actif, jamais une autre machine de la ligne sans rapport
+   * (sinon un poste voisin à l'arrêt bloque à tort l'animation — ex. l'OF
+   * tourne sur M-09 pendant que M-10, inoccupée, reste ARRET).
+   *
+   * Repli sur l'ancien agrégat « toutes les machines liées » seulement quand
+   * la machine porteuse n'est pas connue (mode démo hors-ligne).
    */
-  isLineWorking(): boolean {
-    if (this.activeOrderId == null) return false
-    const bound = STATIONS.filter((id) => this.stations[id].machineId != null)
-    return bound.length > 0 && bound.every((id) => this.stations[id].statut === "MARCHE")
-  }
-
-  /** Aligne les postes visuels non liés sur l'état global des vraies machines. */
-  syncVirtualStations() {
+  private statutConvoyeur(): StatutMachine {
+    if (this.activeMachineId != null) {
+      const station = this.stationByMachine(this.activeMachineId)
+      if (station) return station.statut
+    }
     const bound = STATIONS.filter((id) => this.stations[id].machineId != null)
     const statuses = bound.map((id) => this.stations[id].statut)
-    const aggregate: StatutMachine =
-      statuses.includes("PANNE") ? "PANNE"
+    return statuses.includes("PANNE") ? "PANNE"
       : statuses.includes("MAINTENANCE") ? "MAINTENANCE"
       : statuses.includes("PAUSE") ? "PAUSE"
       : statuses.length > 0 && statuses.every((status) => status === "MARCHE") ? "MARCHE"
       : "ARRET"
+  }
+
+  /** Une ligne est réellement en production si un OF est monté et si sa machine porteuse tourne. */
+  isLineWorking(): boolean {
+    if (this.activeOrderId == null) return false
+    return this.statutConvoyeur() === "MARCHE"
+  }
+
+  /** Aligne les postes visuels non liés sur le statut de référence du convoyeur. */
+  syncVirtualStations() {
+    const aggregate = this.statutConvoyeur()
     let changed = false
     for (const id of STATIONS) {
       const station = this.stations[id]
@@ -316,13 +344,6 @@ export class TwinEngine {
     return null
   }
 
-  /** Station propriétaire du tronçon de bande à l'abscisse donnée. */
-  stationOf(x: number): TwinStation {
-    if (x < LINE.weighBelt.from) return this.stations.blistereuse
-    if (x < LINE.labelBelt.from) return this.stations.trieuse
-    return this.stations.vignetteuse
-  }
-
   isRunning(id: StationId): boolean {
     return this.stations[id].statut === "MARCHE"
   }
@@ -338,7 +359,7 @@ export class TwinEngine {
     return (
       pulseActive ||
       this.products.some((product) => product.mode === "falling") ||
-      (this.activeOrderId != null && STATIONS.some((id) => this.isRunning(id)))
+      this.isLineWorking()
     )
   }
 
@@ -427,15 +448,19 @@ export class TwinEngine {
   }
 
   private moveBeltProducts(dt: number) {
+    // Le convoyeur avance selon la machine qui porte réellement l'OF, pas selon
+    // la station traversée : une machine voisine sans rapport avec cet OF
+    // (ex. M-10 inoccupée pendant que l'OF tourne sur M-09) ne doit jamais
+    // figer le produit en cours de route.
+    const running = this.statutConvoyeur() === "MARCHE"
     const surBande = this.products
       .filter((p) => p.mode === "belt")
       .sort((a, b) => b.x - a.x)
 
     let prevX = Number.POSITIVE_INFINITY
     for (const p of surBande) {
-      const st = this.stationOf(p.x)
       let nx = p.x
-      if (st.statut === "MARCHE") nx = p.x + BELT_SPEED * dt
+      if (running) nx = p.x + BELT_SPEED * dt
       // File d'attente : on ne colle pas le produit de devant.
       nx = Math.max(p.x, Math.min(nx, prevX - GAP_MIN))
 

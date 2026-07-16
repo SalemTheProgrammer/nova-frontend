@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom"
 import { AppShell } from "@/components/layout/AppShell"
 import { WebSocketProvider } from "@/hooks/useWebSocket"
@@ -20,7 +20,10 @@ import { FournisseursPage } from "@/components/dashboard/FournisseursPage"
 import { SimulateurPage } from "@/components/dashboard/SimulateurPage"
 import { NovaVoicePage } from "@/components/dashboard/NovaVoicePage"
 import { DigitalTwinPage } from "@/components/twin/DigitalTwinPage"
+import { LoginPage } from "@/components/auth/LoginPage"
+import { AdminUsersPage } from "@/components/admin/AdminUsersPage"
 import { aiChatBus } from "@/lib/aiChatBus"
+import { useAuth } from "@/lib/auth"
 
 const NAV_VIEWS: NavView[] = [
   "dashboard",
@@ -147,11 +150,59 @@ function ViewRoute() {
   return <AppContent view={view} />
 }
 
+/** Écran de chargement pendant la revalidation du jeton au démarrage. */
+function AuthLoading() {
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-background text-sm text-muted-foreground">
+      Chargement…
+    </div>
+  )
+}
+
+/** Redirige vers /login si non connecté. */
+function RequireAuth({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) return <AuthLoading />
+  if (!user) return <Navigate to="/login" replace />
+  return <>{children}</>
+}
+
+/** Réservé à l'administrateur : les autres retournent au dashboard. */
+function RequireAdmin({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) return <AuthLoading />
+  if (!user) return <Navigate to="/login" replace />
+  if (!user.is_admin) return <Navigate to="/app/dashboard" replace />
+  return <>{children}</>
+}
+
 function App() {
+  const { user, loading } = useAuth()
   return (
     <Routes>
+      <Route
+        path="/login"
+        element={
+          loading ? <AuthLoading /> : user ? <Navigate to="/app/dashboard" replace /> : <LoginPage />
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <RequireAdmin>
+            <AdminUsersPage />
+          </RequireAdmin>
+        }
+      />
+      <Route
+        path="/app/:view"
+        element={
+          <RequireAuth>
+            <ViewRoute />
+          </RequireAuth>
+        }
+      />
       <Route path="/" element={<Navigate to="/app/dashboard" replace />} />
-      <Route path="/app/:view" element={<ViewRoute />} />
       <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
     </Routes>
   )

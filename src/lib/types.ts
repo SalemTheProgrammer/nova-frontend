@@ -449,6 +449,9 @@ export interface ActiviteEvenement {
 // --------------------------- Superviseur autonome --------------------------- //
 export type StatutProposition = "PROPOSEE" | "APPROUVEE" | "REJETEE" | "EXECUTEE" | "ECHOUEE"
 
+export type AutonomyMode = "manuel" | "assiste" | "autopilote"
+export type ProposalRisk = "faible" | "moyen"
+
 export interface AgentProposal {
   id: number
   type: string
@@ -463,6 +466,17 @@ export interface AgentProposal {
   resultat: string | null
   created_at: string
   decided_at: string | null
+  /** "operateur" (décision humaine) ou "autopilote" (mode assisté/autopilote). */
+  decideur: string
+  /** Compte à rebours autopilote (risque moyen) : exécution auto à cet instant
+   * si l'opérateur ne décide pas avant. null = pas de compte à rebours. */
+  execution_auto_at: string | null
+  risque: ProposalRisk
+}
+
+export interface AutonomySettings {
+  mode: AutonomyMode
+  delai_moyen_s: number
 }
 
 // --------------------------- Agent streaming --------------------------- //
@@ -487,6 +501,15 @@ export interface BesoinArtifact {
   disponible: string
   manquant: string
   suffisant: boolean
+}
+
+export interface OrdreListeItem {
+  numero: string
+  article_code: string
+  article_designation: string
+  quantite: string
+  unite: string
+  statut: string
 }
 
 export interface LigneScoreArtifact {

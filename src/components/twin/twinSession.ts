@@ -38,11 +38,18 @@ function save() {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
 
+/**
+ * Les setters ignorent une valeur inchangée : leurs appelants sont des effets
+ * qui se rejouent au rythme du temps réel MES (l'identité du contexte change à
+ * chaque rafraîchissement), et `save()` sérialise puis écrit dans localStorage
+ * de façon synchrone — donc sur le thread qui anime la 3D.
+ */
 export const twinSession = {
   get focusedLineId() {
     return state.focusedLineId
   },
   setFocusedLine(lineId: number) {
+    if (state.focusedLineId === lineId) return
     state.focusedLineId = lineId
     save()
   },
@@ -50,6 +57,7 @@ export const twinSession = {
     return state.selectedStation
   },
   setStation(station: StationId | null) {
+    if (state.selectedStation === station) return
     state.selectedStation = station
     save()
   },
@@ -57,6 +65,7 @@ export const twinSession = {
     return state.labelsOn
   },
   setLabelsOn(value: boolean) {
+    if (state.labelsOn === value) return
     state.labelsOn = value
     save()
   },

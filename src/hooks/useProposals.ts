@@ -37,5 +37,10 @@ export function useProposals() {
   }, [])
 
   const pending = proposals.filter((p) => p.statut === "PROPOSEE")
-  return { proposals, pending, applyDecision }
+  // Dernières décisions résolues (opérateur ou autopilote) : permet de montrer
+  // "Nova a agi seule" juste après une exécution automatique, même si la carte
+  // n'était jamais passée par l'onglet "en attente" (risque faible = exécutée
+  // dès sa création, jamais visible en PROPOSEE côté client).
+  const recentDecided = proposals.filter((p) => p.statut !== "PROPOSEE").slice(0, 5)
+  return { proposals, pending, recentDecided, applyDecision }
 }

@@ -1,8 +1,39 @@
-import { useState } from "react"
-import { AlertTriangle, Check, Loader2, ShieldAlert, Sparkles, X } from "lucide-react"
+import { useEffect, useState } from "react"
+import { AlertTriangle, Bot, Check, Loader2, ShieldAlert, Sparkles, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { agentApi } from "@/lib/api"
 import type { AgentProposal } from "@/lib/types"
+
+/** Secondes restantes avant `iso` (traité comme UTC, comme `created_at`), ou
+ * null si `iso` est absent/déjà passé. Recalculé chaque seconde par l'appelant. */
+function secondesRestantes(iso: string | null): number | null {
+  if (!iso) return null
+  const cible = new Date(iso.endsWith("Z") ? iso : iso + "Z").getTime()
+  const reste = Math.round((cible - Date.now()) / 1000)
+  return reste > 0 ? reste : null
+}
+
+/** Compte à rebours autopilote vivant (risque moyen) : "Exécution auto dans Ns"
+ * — se remet à jour seul chaque seconde, se cache une fois écoulé (le prochain
+ * tick du superviseur back-end exécutera et diffusera la mise à jour réelle). */
+function CompteARebours({ executionAutoAt }: { executionAutoAt: string | null }) {
+  const [reste, setReste] = useState(() => secondesRestantes(executionAutoAt))
+
+  useEffect(() => {
+    setReste(secondesRestantes(executionAutoAt))
+    if (!executionAutoAt) return
+    const id = setInterval(() => setReste(secondesRestantes(executionAutoAt)), 1000)
+    return () => clearInterval(id)
+  }, [executionAutoAt])
+
+  if (reste === null) return null
+  return (
+    <p className="mt-1 flex items-center gap-1 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+      <Bot className="size-3" />
+      Exécution automatique dans {reste}s — rejetez pour annuler.
+    </p>
+  )
+}
 
 const SEVERITE_STYLE: Record<string, { border: string; icon: string }> = {
   CRITICAL: { border: "border-destructive/50", icon: "text-destructive" },
@@ -77,6 +108,13 @@ export function ProposalCard({
           {!compact && (
             <p className="mt-1 text-xs leading-relaxed text-foreground/85">
               {proposal.diagnostic}
+            </p>
+          )}
+          {pending && <CompteARebours executionAutoAt={proposal.execution_auto_at} />}
+          {!pending && proposal.decideur === "autopilote" && (
+            <p className="mt-1 flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+              <Bot className="size-3" />
+              Nova a agi seule (mode autonomie)
             </p>
           )}
           {proposal.resultat && (
