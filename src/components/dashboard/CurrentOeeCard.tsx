@@ -29,8 +29,11 @@ export function CurrentOeeCard({
       .oeeHistory(ligneId, "week")
       .then((points) => {
         if (cancelled || points.length < 2) return
-        const hier = Number(points[points.length - 2].trs)
-        const aujourdhui = Number(points[points.length - 1].trs)
+        const avantDernier = points[points.length - 2]
+        const dernier = points[points.length - 1]
+        if (avantDernier.trs === null || dernier.trs === null) return
+        const hier = Number(avantDernier.trs)
+        const aujourdhui = Number(dernier.trs)
         // Différence en points de pourcentage du TRS, pas un delta
         // relatif — sinon une base proche de 0 fait exploser le ratio.
         setDelta((aujourdhui - hier) * 100)

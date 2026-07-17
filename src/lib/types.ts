@@ -582,7 +582,7 @@ export interface PointOEE {
   disponibilite: string
   performance: string
   qualite: string
-  trs: string
+  trs: string | null
 }
 
 export interface DashboardResume {

@@ -45,7 +45,7 @@ export function OeeMetricsChart({ ligneId }: { ligneId: number | null }) {
 
   const rows = points.map((point) => ({
     label: point.label,
-    TRS: Math.round(Number(point.trs) * 100),
+    TRS: point.trs === null ? null : Math.round(Number(point.trs) * 100),
   }))
 
   return (
