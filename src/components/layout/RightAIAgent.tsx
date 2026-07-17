@@ -5,6 +5,7 @@ import {
   Mic,
   Sparkles,
   Square,
+  Trash2,
   Volume2,
   VolumeX,
   Wifi,
@@ -81,7 +82,7 @@ export function RightAIAgent({
     setInput("")
     void send(text)
   })
-  const { turns, loading, send } = useAgentChat(
+  const { turns, loading, send, clear } = useAgentChat(
     (finalText) => {
       if (ttsEnabledRef.current && finalText) void voice.speak(finalText)
     },
@@ -153,6 +154,13 @@ export function RightAIAgent({
     }
   }
 
+  function handleClear() {
+    if (turns.length === 0) return
+    if (window.confirm("Effacer toute la conversation avec Nova ? Cette action est irréversible.")) {
+      void clear()
+    }
+  }
+
   return (
     <aside
       className={cn(
@@ -170,6 +178,14 @@ export function RightAIAgent({
         <div className="flex items-center gap-2">
           <Sparkles className="size-4 text-primary" />
           <span className="text-sm font-semibold">Assistant Nova</span>
+          <button
+            onClick={handleClear}
+            disabled={turns.length === 0}
+            title="Effacer la conversation"
+            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
           {pending.length > 0 && (
             <span className="inline-flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
               {pending.length}

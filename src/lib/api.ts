@@ -202,6 +202,10 @@ export function getChatHistory(threadId: string) {
   )
 }
 
+export function deleteChatThread(threadId: string) {
+  return api.del(`/chat/${encodeURIComponent(threadId)}`)
+}
+
 // --------------------------- Superviseur autonome --------------------------- //
 export const agentApi = {
   propositions: (enAttenteSeulement = false) =>
