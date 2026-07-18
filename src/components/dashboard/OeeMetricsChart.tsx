@@ -81,15 +81,16 @@ export function OeeMetricsChart({ ligneId }: { ligneId: number | null }) {
           <EmptyState message="Aucune donnée sur cette période." />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={rows} margin={{ top: 14, right: 12, left: -20, bottom: 0 }}>
+            <LineChart data={rows} margin={{ top: 14, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
               <YAxis
                 domain={[0, 100]}
+                ticks={[0, 20, 40, 60, 80, 100]}
                 tick={{ fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
-                width={36}
+                width={40}
                 unit="%"
               />
               <Tooltip
