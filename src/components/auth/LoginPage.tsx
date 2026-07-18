@@ -74,7 +74,7 @@ export function LoginPage() {
                 id="tel"
                 type="tel"
                 autoComplete="tel"
-                placeholder="+216 55 516 823"
+                placeholder="+216 XX XXX XXX"
                 value={telephone}
                 onChange={(ev) => setTelephone(ev.target.value)}
                 required
