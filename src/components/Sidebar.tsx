@@ -28,6 +28,7 @@ import { lignesApi } from "@/lib/api"
 import type { LigneProduction } from "@/lib/types"
 import { useWebSocket } from "@/hooks/useWebSocket"
 import { useAuth } from "@/lib/auth"
+import { canAccessView } from "@/lib/permissions"
 
 export type NavView =
   | "dashboard"
@@ -137,7 +138,15 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
     if (RESSOURCES.some((item) => item.view === view)) setResourcesOpen(true)
   }, [view])
 
-  const railItems = GROUPES_PRINCIPAUX.flatMap((group) => group.items)
+  // Filtre les entrées de nav selon le périmètre d'outils du numéro connecté
+  // (voir lib/permissions.ts) — un compte restreint ne doit pas voir de lien
+  // vers une page dont l'API lui refusera l'accès.
+  const groupesPrincipauxVisibles = GROUPES_PRINCIPAUX.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => canAccessView(user, item.view)),
+  })).filter((group) => group.items.length > 0)
+  const ressourcesVisibles = RESSOURCES.filter((item) => canAccessView(user, item.view))
+  const railItems = groupesPrincipauxVisibles.flatMap((group) => group.items)
 
   return (
     <>
@@ -284,7 +293,7 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
           </div>
 
           <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
-            {GROUPES_PRINCIPAUX.map((group) => (
+            {groupesPrincipauxVisibles.map((group) => (
               <div key={group.titre}>
                 <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/40">
                   {group.titre}
@@ -302,31 +311,33 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
               </div>
             ))}
 
-            <div>
-              <button
-                type="button"
-                onClick={() => setResourcesOpen((value) => !value)}
-                aria-expanded={resourcesOpen}
-                className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/40 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/70"
-              >
-                Ressources
-                <ChevronDown
-                  className={cn("size-3.5 transition-transform", resourcesOpen && "rotate-180")}
-                />
-              </button>
-              {resourcesOpen && (
-                <div className="mt-1 space-y-0.5">
-                  {RESSOURCES.map((item) => (
-                    <NavigationButton
-                      key={item.view}
-                      item={item}
-                      active={view === item.view}
-                      onClick={() => onChange(item.view)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+            {ressourcesVisibles.length > 0 && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setResourcesOpen((value) => !value)}
+                  aria-expanded={resourcesOpen}
+                  className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/40 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/70"
+                >
+                  Ressources
+                  <ChevronDown
+                    className={cn("size-3.5 transition-transform", resourcesOpen && "rotate-180")}
+                  />
+                </button>
+                {resourcesOpen && (
+                  <div className="mt-1 space-y-0.5">
+                    {ressourcesVisibles.map((item) => (
+                      <NavigationButton
+                        key={item.view}
+                        item={item}
+                        active={view === item.view}
+                        onClick={() => onChange(item.view)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </nav>
 
           <div className="space-y-2 border-t border-sidebar-border px-4 py-3">

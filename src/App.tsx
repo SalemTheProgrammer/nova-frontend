@@ -24,6 +24,7 @@ import { LoginPage } from "@/components/auth/LoginPage"
 import { AdminUsersPage } from "@/components/admin/AdminUsersPage"
 import { aiChatBus } from "@/lib/aiChatBus"
 import { useAuth } from "@/lib/auth"
+import { canAccessView, firstAccessibleView } from "@/lib/permissions"
 
 const NAV_VIEWS: NavView[] = [
   "dashboard",
@@ -146,7 +147,15 @@ function AppContent({ view }: { view: NavView }) {
 
 function ViewRoute() {
   const { view } = useParams<{ view: string }>()
-  if (!isNavView(view)) return <Navigate to="/app/dashboard" replace />
+  const { user } = useAuth()
+  if (!isNavView(view)) return <Navigate to={`/app/${firstAccessibleView(user)}`} replace />
+  // Garde-fou pour un lien direct/marque-page vers une page hors du périmètre
+  // de l'utilisateur — la nav (Sidebar) cache déjà ces entrées, mais l'URL
+  // reste tapable à la main ; le backend refuserait de toute façon les appels
+  // API de cette page (voir app/core/access.py), donc autant rediriger direct.
+  if (!canAccessView(user, view)) {
+    return <Navigate to={`/app/${firstAccessibleView(user)}`} replace />
+  }
   return <AppContent view={view} />
 }
 
