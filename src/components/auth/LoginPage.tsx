@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft, Loader2, MessageCircle, ShieldCheck } from "lucide-react"
-import logoNova from "@/assets/hero.png"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { authApi } from "@/lib/api"
@@ -57,8 +56,7 @@ export function LoginPage() {
     <div className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-violet-50 via-background to-background p-4 dark:from-violet-950/30">
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-xl">
         <div className="mb-6 flex flex-col items-center text-center">
-          <img src={logoNova} alt="" className="mb-3 size-14 object-contain" />
-          <h1 className="text-xl font-bold tracking-tight">Nova Data</h1>
+          <img src="/r.png" alt="Nova Data Analytics" className="mb-3 h-12 w-auto object-contain" />
           <p className="mt-1 text-sm text-muted-foreground">
             {etape === "telephone"
               ? "Connectez-vous avec votre numéro de téléphone."
