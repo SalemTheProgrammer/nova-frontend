@@ -121,19 +121,50 @@ export function RightAIAgent({
     return () => aiChatBus.setHandler(null)
   }, [send])
 
+  const insightsTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     let cancelled = false
-    aiApi
-      .insights()
-      .then((r) => {
-        if (!cancelled) setInsights(r.insights)
-      })
-      .catch(() => {})
+
+    function fetchInsights() {
+      aiApi
+        .insights()
+        .then((r) => {
+          if (!cancelled) setInsights(r.insights)
+        })
+        .catch(() => {})
+    }
+
+    fetchInsights()
     return () => {
       cancelled = true
     }
-    // se rafraîchit à chaque événement machine reçu par WebSocket
+  }, [])
+
+  // Les événements machine (broadcasts WebSocket) arrivent plusieurs fois par
+  // seconde en usine simulée : un refetch par message a saturé le pool de
+  // connexions DB en production (endpoint coûteux appelé ~2x/s). On se
+  // contente donc d'un refresh au plus une fois toutes les 15s, comme
+  // useDashboardData le fait déjà pour le résumé du tableau de bord.
+  useEffect(() => {
+    if (!lastMessage) return
+    if (insightsTimer.current == null) {
+      insightsTimer.current = setTimeout(() => {
+        insightsTimer.current = null
+        aiApi
+          .insights()
+          .then((r) => setInsights(r.insights))
+          .catch(() => {})
+      }, 15000)
+    }
   }, [lastMessage])
+
+  useEffect(
+    () => () => {
+      if (insightsTimer.current != null) clearTimeout(insightsTimer.current)
+    },
+    [],
+  )
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })

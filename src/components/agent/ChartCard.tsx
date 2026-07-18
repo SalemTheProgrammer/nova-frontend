@@ -47,11 +47,24 @@ export function ChartCard({ artifact }: { artifact: AgentArtifact }) {
   if (!spec.series?.length) return null
 
   const multi = spec.series.length > 1
+  // Un pourcentage (TRS, taux qualité…) doit toujours s'afficher sur une
+  // échelle fixe 0-100 % : laisser Recharts auto-cadrer sur la plage des
+  // données exagère les petites valeurs (ex. un TRS réel de 2 % rempli tout
+  // le graphique et donne l'impression d'un pic, alors que c'est juste bas).
+  const estPourcentage = spec.unit === "%"
   const axes = (
     <>
       <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
       <XAxis dataKey="x" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-      <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={36} unit={spec.unit ?? undefined} />
+      <YAxis
+        tick={{ fontSize: 11 }}
+        tickLine={false}
+        axisLine={false}
+        width={36}
+        unit={spec.unit ?? undefined}
+        domain={estPourcentage ? [0, 100] : undefined}
+        ticks={estPourcentage ? [0, 20, 40, 60, 80, 100] : undefined}
+      />
       <Tooltip
         contentStyle={{ fontSize: 12, borderRadius: 8 }}
         formatter={(v) => `${v}${spec.unit ?? ""}`}
