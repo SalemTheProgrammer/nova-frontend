@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { CheckCircle2, FlaskConical, Radio } from "lucide-react"
 import {
   Area,
@@ -11,6 +11,8 @@ import {
   YAxis,
 } from "recharts"
 import { useDashboardData } from "@/hooks/useDashboardData"
+import { lignesApi } from "@/lib/api"
+import type { LigneProduction } from "@/lib/types"
 import { SegmentedBlockGauge } from "@/components/dashboard/SegmentedBlockGauge"
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton"
 import { ErrorBanner } from "@/components/dashboard/primitives"
@@ -45,14 +47,31 @@ function CadenceTooltip({ active, payload, label }: any) {
 }
 
 /** Dashboard MES : Cockpit Haute Performance 100vh Épuré & Convaincant */
-export function MesDashboardPage({ ligneId }: { ligneId: number | null }) {
+export function MesDashboardPage({
+  ligneId,
+  onChangeLigne,
+}: {
+  ligneId: number | null
+  onChangeLigne?: (id: number | null) => void
+}) {
   const { resume, machines, loading, error, refresh } = useDashboardData(ligneId)
+  const [lignes, setLignes] = useState<LigneProduction[]>([])
   const [sparkplugOpen, setSparkplugOpen] = useState(false)
   const [prelevementOpen, setPrelevementOpen] = useState(false)
 
+  useEffect(() => {
+    lignesApi.list().then(setLignes).catch(() => {})
+  }, [])
+
   // Rendement global calculé ou valeur de référence optimale
-  const rawTrs = resume?.trs_global ? Number(resume.trs_global) : 0.78
-  const trsPercentage = Math.round(rawTrs <= 1 ? rawTrs * 100 : rawTrs)
+  const parsedTrs = Number(resume?.trs_global ?? 0)
+  const trsPercentage = Math.round(
+    parsedTrs > 0 && parsedTrs <= 1
+      ? parsedTrs * 100
+      : parsedTrs > 1
+        ? parsedTrs
+        : 84
+  )
 
   // Machines réelles ou postes de référence
   const machinesAffichees = machines.length > 0
@@ -61,7 +80,7 @@ export function MesDashboardPage({ ligneId }: { ligneId: number | null }) {
         nom: m.nom,
         statut: m.statut === "MARCHE" ? "En marche" : (m.statut === "PANNE" ? "En panne" : "À l'arrêt"),
         cadence: m.temps_cycle_actuel_s ? `${Math.round(60 / Number(m.temps_cycle_actuel_s))} cpm` : "120 cpm",
-        rendement: m.trs ? `${Math.round(Number(m.trs) * 100)}%` : `${84 - idx * 3}%`,
+        rendement: m.trs && Number(m.trs) > 0 ? `${Math.round(Number(m.trs) * 100)}%` : `${84 - idx * 3}%`,
         enMarche: m.statut === "MARCHE",
       }))
     : [
@@ -70,20 +89,25 @@ export function MesDashboardPage({ ligneId }: { ligneId: number | null }) {
         { code: "Poste 3", nom: "Compteuse & Remplisseuse", statut: "En marche", cadence: "122 cpm", rendement: "86%", enMarche: true },
       ]
 
-  // Statistiques de production intuitives
-  const prodCible = resume?.production_cible ? Number(resume.production_cible) : 8000
-  const prodBonne = resume?.quantite_bonne ? Number(resume.quantite_bonne) : 6382
-  const prodRejet = resume?.quantite_rejetee ? Number(resume.quantite_rejetee) : 38
+  // Statistiques de production intuitives (données réelles si > 0, sinon valeurs réalistes)
+  const rawCible = Number(resume?.production_cible ?? 0)
+  const rawBonne = Number(resume?.quantite_bonne ?? 0)
+  const rawRejet = Number(resume?.quantite_rejetee ?? 0)
+
+  const prodCible = rawCible > 0 ? rawCible : 5000
+  const prodBonne = rawBonne > 0 ? rawBonne : 3680
+  const prodRejet = rawRejet > 0 ? rawRejet : 24
   const prodTotale = prodBonne + prodRejet
   const avancementPct = Math.min(100, Math.round((prodTotale / prodCible) * 100))
   const tauxConformite = prodTotale > 0 ? ((prodBonne / prodTotale) * 100).toFixed(1) : "99.4"
   const tauxRejet = prodTotale > 0 ? ((prodRejet / prodTotale) * 100).toFixed(1) : "0.6"
 
   const ofActif = resume?.of_actif
+  const nomLigneActive = lignes.find((l) => l.id === ligneId)?.designation
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden p-3 sm:p-4 md:p-5 gap-3 bg-slate-50/70 dark:bg-zinc-950 font-sans select-none">
-      {/* 1. Barre Supérieure : Titre Épuré & Statut Temps Réel (Bouton Actualiser retiré) */}
+      {/* 1. Barre Supérieure : Titre Épuré, Sélecteur de Ligne & Statut Temps Réel */}
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200/80 pb-3 dark:border-zinc-800">
         <div className="flex items-center gap-3">
           <div>
@@ -91,13 +115,34 @@ export function MesDashboardPage({ ligneId }: { ligneId: number | null }) {
               <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
                 Supervision d'Atelier
               </h1>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-500/25 px-2.5 py-0.5 text-xs font-bold text-emerald-700 shadow-xs dark:bg-emerald-950/40 dark:text-emerald-400">
+
+              {/* Sélecteur de Ligne intégré directement dans le Dashboard */}
+              <div className="relative inline-flex items-center">
+                <select
+                  value={ligneId ?? ""}
+                  onChange={(e) => onChangeLigne?.(e.target.value ? Number(e.target.value) : null)}
+                  className="rounded-lg border border-slate-200 bg-white/95 px-2.5 py-1 text-xs font-bold text-slate-700 shadow-xs focus:outline-hidden dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 cursor-pointer hover:border-slate-300 transition"
+                >
+                  <option value="">🏢 Toutes les lignes (Usine)</option>
+                  {lignes.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      🏭 {l.code} — {l.designation}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-500/25 px-2.5 py-0.5 text-xs font-bold text-emerald-700 shadow-xs dark:bg-emerald-950/40 dark:text-emerald-400">
                 <span className="size-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
                 Ligne en Production
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5 font-medium">
-              {ofActif ? `Ordre ${ofActif.numero} — ${ofActif.article_designation}` : "Ligne 1 • Paracétamol 500 mg — Comprimés"}
+              {ofActif
+                ? `Ordre ${ofActif.numero} — ${ofActif.article_designation} ${nomLigneActive ? `(${nomLigneActive})` : ""}`
+                : nomLigneActive
+                  ? `${nomLigneActive} • Paracétamol 500 mg — Comprimés`
+                  : "Vue Globale Usine • Ensemble des lignes actives"}
             </p>
           </div>
         </div>

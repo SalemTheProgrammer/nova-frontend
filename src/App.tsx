@@ -113,7 +113,7 @@ function AppContent({ view }: { view: NavView }) {
   function renderView() {
     switch (view) {
       case "dashboard":
-        return <MesDashboardPage ligneId={ligneId} />
+        return <MesDashboardPage ligneId={ligneId} onChangeLigne={setLigneId} />
       case "machines":
         return <MachinesPage ligneId={ligneId} />
       case "jumeau":
