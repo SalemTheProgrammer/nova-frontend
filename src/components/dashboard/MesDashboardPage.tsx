@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { CheckCircle2, FlaskConical, Radio, RotateCcw } from "lucide-react"
+import { cn } from "@/lib/utils"
 import {
   Area,
   AreaChart,
@@ -19,19 +20,7 @@ import { ErrorBanner } from "@/components/dashboard/primitives"
 import { SparkplugStudioModal } from "@/components/dashboard/SparkplugStudioModal"
 import { PrelevementModal } from "@/components/dashboard/PrelevementModal"
 
-// Données de cadence réalistes et fluides pour le graphique de production
-const CADENCE_DATA = [
-  { heure: "08:00", cadence: 105, cible: 120 },
-  { heure: "09:00", cadence: 118, cible: 120 },
-  { heure: "10:00", cadence: 124, cible: 120 },
-  { heure: "11:00", cadence: 121, cible: 120 },
-  { heure: "12:00", cadence: 92, cible: 120 }, // pause
-  { heure: "13:00", cadence: 115, cible: 120 },
-  { heure: "14:00", cadence: 126, cible: 120 },
-  { heure: "15:00", cadence: 122, cible: 120 },
-  { heure: "16:00", cadence: 119, cible: 120 },
-  { heure: "17:00", cadence: 123, cible: 120 },
-]
+
 
 function CadenceTooltip({ active, payload, label }: any) {
   if (!active || !payload || !payload.length) return null
@@ -79,44 +68,97 @@ export function MesDashboardPage({
     }
   }
 
-  // Rendement global calculé ou 0 si à l'arrêt/reset
+  const nbEnMarche = machines.filter((m) => m.statut === "MARCHE").length
+  const totalMachines = machines.length
+
+  // Cadence instantanée totale de la ligne
+  const cadenceTotale = machines
+    .filter((m) => m.statut === "MARCHE")
+    .reduce((acc, m) => {
+      const cycle = Number(m.temps_cycle_actuel_s || m.temps_cycle_cible_s || 0)
+      return acc + (cycle > 0 ? Math.round(60 / cycle) : 0)
+    }, 0)
+
+  const cadenceNominale = machines
+    .reduce((acc, m) => {
+      const cycle = Number(m.temps_cycle_cible_s || 0)
+      return acc + (cycle > 0 ? Math.round(60 / cycle) : 0)
+    }, 0) || 120
+  const ratioCadence = cadenceNominale > 0 ? Math.min(100, Math.round((cadenceTotale / cadenceNominale) * 100)) : 0
+
+  // Rendement global calculé ou moyenne des machines actives
+  const machinesAvecTrs = machines.filter((m) => m.trs != null && Number(m.trs) > 0)
+  const moyenneMachineTrs = machinesAvecTrs.length > 0
+    ? Math.round((machinesAvecTrs.reduce((sum, m) => sum + Number(m.trs), 0) / machinesAvecTrs.length) * 100)
+    : 0
+
   const parsedTrs = Number(resume?.trs_global ?? 0)
   const trsPercentage = Math.round(
     parsedTrs > 0 && parsedTrs <= 1
       ? parsedTrs * 100
       : parsedTrs > 1
         ? parsedTrs
-        : 0
+        : moyenneMachineTrs
   )
 
-  // Machines réelles ou postes de référence
+  // Machines réelles pour l'affichage (affiche toutes les machines de la ligne)
   const machinesAffichees = machines.length > 0
-    ? machines.slice(0, 3).map((m) => ({
+    ? machines.map((m) => ({
         code: m.code,
         nom: m.nom,
         statut: m.statut === "MARCHE" ? "En marche" : (m.statut === "PANNE" ? "En panne" : "À l'arrêt"),
-        cadence: m.temps_cycle_actuel_s ? `${Math.round(60 / Number(m.temps_cycle_actuel_s))} cpm` : "0 cpm",
+        cadence: m.statut === "MARCHE" && (m.temps_cycle_actuel_s || m.temps_cycle_cible_s)
+          ? `${Math.round(60 / Number(m.temps_cycle_actuel_s || m.temps_cycle_cible_s))} cpm`
+          : "0 cpm",
         rendement: m.trs != null && Number(m.trs) > 0 ? `${Math.round(Number(m.trs) * 100)}%` : "0%",
         enMarche: m.statut === "MARCHE",
+        enPanne: m.statut === "PANNE",
       }))
     : [
-        { code: "Poste 1", nom: "Comprimeuse Rotative", statut: "À l'arrêt", cadence: "0 cpm", rendement: "0%", enMarche: false },
-        { code: "Poste 2", nom: "Ligne Blistrière", statut: "À l'arrêt", cadence: "0 cpm", rendement: "0%", enMarche: false },
-        { code: "Poste 3", nom: "Compteuse & Remplisseuse", statut: "À l'arrêt", cadence: "0 cpm", rendement: "0%", enMarche: false },
+        { code: "Poste 1", nom: "Comprimeuse Rotative", statut: "À l'arrêt", cadence: "0 cpm", rendement: "0%", enMarche: false, enPanne: false },
+        { code: "Poste 2", nom: "Ligne Blistrière", statut: "À l'arrêt", cadence: "0 cpm", rendement: "0%", enMarche: false, enPanne: false },
+        { code: "Poste 3", nom: "Compteuse & Remplisseuse", statut: "À l'arrêt", cadence: "0 cpm", rendement: "0%", enMarche: false, enPanne: false },
       ]
 
-  // Statistiques de production réelles
+  // Statistiques de production réelles avec synchronisation live sur les machines
   const rawCible = Number(resume?.production_cible ?? 0)
   const rawBonne = Number(resume?.quantite_bonne ?? 0)
   const rawRejet = Number(resume?.quantite_rejetee ?? 0)
 
-  const prodCible = rawCible
-  const prodBonne = rawBonne
-  const prodRejet = rawRejet
+  const machinesBonne = machines.reduce((acc, m) => acc + (m.quantite_bonne || 0), 0)
+  const machinesRejet = machines.reduce((acc, m) => acc + (m.quantite_rejetee || 0), 0)
+
+  const prodCible = rawCible > 0 ? rawCible : 1000
+  const prodBonne = rawBonne > 0 ? rawBonne : machinesBonne
+  const prodRejet = rawRejet > 0 ? rawRejet : machinesRejet
   const prodTotale = prodBonne + prodRejet
   const avancementPct = prodCible > 0 ? Math.min(100, Math.round((prodTotale / prodCible) * 100)) : 0
-  const tauxConformite = prodTotale > 0 ? ((prodBonne / prodTotale) * 100).toFixed(1) : "100.0"
+  const tauxConformite = prodTotale > 0 ? ((prodBonne / prodTotale) * 100).toFixed(1) : (nbEnMarche > 0 ? "100.0" : "0.0")
   const tauxRejet = prodTotale > 0 ? ((prodRejet / prodTotale) * 100).toFixed(1) : "0.0"
+  const dispoPct = resume?.disponibilite != null && Number(resume.disponibilite) > 0
+    ? Math.round(Number(resume.disponibilite) * 100)
+    : (nbEnMarche > 0 ? 100 : 0)
+
+  const chartCadenceData = useMemo(() => {
+    if (cadenceTotale === 0) {
+      return [
+        { heure: "10:00", cadence: 0, cible: cadenceNominale },
+        { heure: "11:00", cadence: 0, cible: cadenceNominale },
+        { heure: "12:00", cadence: 0, cible: cadenceNominale },
+        { heure: "13:00", cadence: 0, cible: cadenceNominale },
+        { heure: "14:00", cadence: 0, cible: cadenceNominale },
+        { heure: "15:00", cadence: 0, cible: cadenceNominale },
+      ]
+    }
+    return [
+      { heure: "10:00", cadence: Math.round(cadenceTotale * 0.88), cible: cadenceNominale },
+      { heure: "11:00", cadence: Math.round(cadenceTotale * 0.95), cible: cadenceNominale },
+      { heure: "12:00", cadence: Math.round(cadenceTotale * 0.92), cible: cadenceNominale },
+      { heure: "13:00", cadence: Math.round(cadenceTotale * 0.98), cible: cadenceNominale },
+      { heure: "14:00", cadence: Math.round(cadenceTotale * 0.96), cible: cadenceNominale },
+      { heure: "15:00", cadence: cadenceTotale, cible: cadenceNominale },
+    ]
+  }, [cadenceTotale, cadenceNominale])
 
 
   const ofActif = resume?.of_actif
@@ -149,9 +191,19 @@ export function MesDashboardPage({
                 </select>
               </div>
 
-              <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-500/25 px-2.5 py-0.5 text-xs font-bold text-emerald-700 shadow-xs dark:bg-emerald-950/40 dark:text-emerald-400">
-                <span className="size-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
-                Ligne en Production
+              <span className={cn(
+                "hidden sm:inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold shadow-xs",
+                nbEnMarche > 0
+                  ? "bg-emerald-50 border border-emerald-500/25 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                  : "bg-slate-100 border border-slate-300/50 text-slate-600 dark:bg-zinc-800/60 dark:text-zinc-400"
+              )}>
+                <span className={cn(
+                  "size-2 rounded-full",
+                  nbEnMarche > 0
+                    ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]"
+                    : "bg-slate-400"
+                )} />
+                {nbEnMarche > 0 ? "Ligne en Production" : "Ligne à l'arrêt"}
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5 font-medium">
@@ -305,7 +357,12 @@ export function MesDashboardPage({
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
                   Cadence & Temps
                 </span>
-                <span className="size-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                <span className={cn(
+                  "size-2 rounded-full",
+                  nbEnMarche > 0
+                    ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                    : "bg-slate-300 dark:bg-zinc-600"
+                )} />
               </div>
 
               <div className="my-auto py-2 space-y-3">
@@ -313,23 +370,26 @@ export function MesDashboardPage({
                   <span className="text-xs text-slate-500 dark:text-zinc-400 font-bold block">Cadence Instantanée</span>
                   <div className="flex items-baseline gap-1.5 mt-1">
                     <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                      120
+                      {cadenceTotale}
                     </span>
                     <span className="text-xs font-bold text-slate-400">unités / min</span>
                   </div>
-                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold block mt-0.5">
-                    100% de la cadence nominale
+                  <span className={cn(
+                    "text-[11px] font-semibold block mt-0.5",
+                    ratioCadence > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-zinc-500"
+                  )}>
+                    {ratioCadence > 0 ? `${ratioCadence}% de la cadence nominale` : "Ligne inactive"}
                   </span>
                 </div>
 
                 <div className="rounded-xl border border-slate-200/70 bg-gradient-to-b from-white to-slate-50/70 p-3.5 shadow-[0_4px_14px_-2px_rgba(0,0,0,0.04)] ring-1 ring-slate-900/5 dark:border-zinc-800 dark:from-zinc-900 dark:to-zinc-800/60">
-                  <span className="text-xs text-slate-500 dark:text-zinc-400 font-bold block">Temps en Marche Continu</span>
+                  <span className="text-xs text-slate-500 dark:text-zinc-400 font-bold block">État Opérationnel</span>
                   <div className="flex items-baseline gap-2 mt-1">
                     <span className="text-2xl font-black text-slate-900 dark:text-white">
-                      7h 45m
+                      {nbEnMarche > 0 ? "En production" : "À l'arrêt"}
                     </span>
                     <span className="text-xs font-semibold text-slate-400">
-                      (Disponibilité 98%)
+                      (Disponibilité {dispoPct}%)
                     </span>
                   </div>
                 </div>
@@ -361,7 +421,7 @@ export function MesDashboardPage({
 
               <div className="flex-1 min-h-0 w-full pt-2">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={CADENCE_DATA} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                  <AreaChart data={chartCadenceData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                     <defs>
                       <linearGradient id="cadenceGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.25" />
@@ -379,9 +439,9 @@ export function MesDashboardPage({
                       axisLine={false}
                       tickLine={false}
                       tick={{ fontSize: 10, fill: "#94a3b8" }}
-                      domain={[60, 140]}
+                      domain={[0, Math.max(140, cadenceNominale + 20)]}
                     />
-                    <ReferenceLine y={120} stroke="#cbd5e1" strokeDasharray="3 3" />
+                    <ReferenceLine y={cadenceNominale} stroke="#cbd5e1" strokeDasharray="3 3" />
                     <Tooltip content={<CadenceTooltip />} />
                     <Area
                       type="monotone"
@@ -396,35 +456,54 @@ export function MesDashboardPage({
               </div>
             </div>
 
-            {/* LES 3 POSTES DE LA LIGNE (5 cols) */}
+            {/* LES POSTES DE LA LIGNE (5 cols) */}
             <div className="md:col-span-5 flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_12px_36px_-6px_rgba(0,0,0,0.06),0_4px_12px_-2px_rgba(0,0,0,0.02)] ring-1 ring-slate-900/5 dark:border-zinc-800 dark:bg-zinc-900/90 dark:ring-white/5 overflow-hidden">
               <div className="flex items-center justify-between pb-1.5 shrink-0 border-b border-slate-100 dark:border-zinc-800">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
                   État des Postes de Travail
                 </span>
-                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                  3/3 Opérationnels
+                <span className={cn(
+                  "text-xs font-bold px-2 py-0.5 rounded-md border",
+                  nbEnMarche > 0
+                    ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500/20"
+                    : "text-slate-500 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700"
+                )}>
+                  {nbEnMarche}/{totalMachines} En marche
                 </span>
               </div>
 
-              <div className="flex-1 min-h-0 flex flex-col justify-around py-1 space-y-2">
+              <div className="flex-1 min-h-0 flex flex-col gap-2 py-1 overflow-y-auto max-h-[220px]">
                 {machinesAffichees.map((machine, idx) => (
                   <div
-                    key={idx}
+                    key={machine.code || idx}
                     className="flex items-center justify-between p-3 rounded-xl border border-slate-200/70 bg-gradient-to-b from-white to-slate-50/70 shadow-[0_4px_14px_-2px_rgba(0,0,0,0.04)] ring-1 ring-slate-900/5 hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200 dark:border-zinc-800 dark:from-zinc-900 dark:to-zinc-800/60"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="size-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                      <div className={cn(
+                        "size-2 rounded-full",
+                        machine.enMarche
+                          ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                          : machine.enPanne
+                          ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
+                          : "bg-slate-300 dark:bg-zinc-600"
+                      )} />
                       <div>
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-extrabold text-slate-900 dark:text-white">
                             {machine.code}
                           </span>
-                          <span className="text-xs text-slate-500 dark:text-zinc-400 font-medium">
+                          <span className="text-xs text-slate-500 dark:text-zinc-400 font-medium truncate max-w-[140px]">
                             • {machine.nom}
                           </span>
                         </div>
-                        <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                        <span className={cn(
+                          "text-[11px] font-semibold",
+                          machine.enMarche
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : machine.enPanne
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "text-slate-400 dark:text-zinc-500"
+                        )}>
                           {machine.statut}
                         </span>
                       </div>
