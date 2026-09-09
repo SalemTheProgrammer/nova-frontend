@@ -1,4 +1,4 @@
-import { AlertTriangle, Pause, Play, Square } from "lucide-react"
+import { AlertTriangle, Pause, Play, RotateCcw, Square } from "lucide-react"
 import { useEffect, useState } from "react"
 import { lignesApi, machinesApi, simulatorApi } from "@/lib/api"
 import type { LigneProduction, Machine, MachineEvent } from "@/lib/types"
@@ -161,6 +161,32 @@ export function SimulateurPage() {
     }
   }
 
+  const [isResetting, setIsResetting] = useState(false)
+  const [resetMessage, setResetMessage] = useState<string | null>(null)
+
+
+  async function handleReset() {
+    if (!window.confirm("Voulez-vous vraiment réinitialiser toutes les machines, événements et compteurs de l'atelier à 0 ?")) {
+      return
+    }
+    try {
+      setIsResetting(true)
+      setResetMessage(null)
+      const res = await simulatorApi.reset()
+      setResetMessage(res.message || "Atelier remis à zéro avec succès.")
+      setTimeout(() => setResetMessage(null), 4000)
+      if (ligneId != null) {
+        const list = await machinesApi.list(ligneId)
+        setMachines(list)
+      }
+    } catch (e) {
+      setResetMessage(e instanceof Error ? e.message : "Erreur lors de la remise à zéro.")
+    } finally {
+      setIsResetting(false)
+    }
+  }
+
+
   return (
     <Page
       fullHeight
@@ -168,18 +194,36 @@ export function SimulateurPage() {
       description="Piloter une ligne : machines, incidents, réaction de Nova."
     >
       <div className="flex h-full flex-col gap-4 overflow-hidden">
-        <Select
-          value={ligneId ?? ""}
-          onChange={(e) => setLigneId(e.target.value ? Number(e.target.value) : null)}
-          className="w-fit min-w-56 shrink-0"
-        >
-          {lignes.length === 0 && <option value="">Aucune ligne</option>}
-          {lignes.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.code} — {l.designation}
-            </option>
-          ))}
-        </Select>
+        <div className="flex items-center justify-between gap-3 shrink-0">
+          <Select
+            value={ligneId ?? ""}
+            onChange={(e) => setLigneId(e.target.value ? Number(e.target.value) : null)}
+            className="w-fit min-w-56 shrink-0"
+          >
+            {lignes.length === 0 && <option value="">Aucune ligne</option>}
+            {lignes.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.code} — {l.designation}
+              </option>
+            ))}
+          </Select>
+
+          <button
+            onClick={handleReset}
+            disabled={isResetting}
+            className="inline-flex items-center gap-2 rounded-lg border border-red-200/90 bg-red-50/80 px-3.5 py-2 text-xs font-bold text-red-700 shadow-xs hover:bg-red-100 hover:border-red-300 transition disabled:opacity-50 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300 cursor-pointer"
+            title="Remettre toutes les machines, événements et compteurs à zéro"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 ${isResetting ? "animate-spin" : ""}`} />
+            <span>{isResetting ? "Réinitialisation…" : "Remise à zéro atelier (Reset)"}</span>
+          </button>
+        </div>
+
+        {resetMessage && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
+            ✓ {resetMessage}
+          </div>
+        )}
 
         <ErrorBanner message={error} />
 

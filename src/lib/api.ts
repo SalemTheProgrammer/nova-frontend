@@ -466,7 +466,9 @@ export const simulatorApi = {
   autoStop: () => api.post<{ actif: boolean }>("/simulateur/auto/stop"),
   scenario: (nom: "panne-critique" | "derive-qualite" | "rupture-stock") =>
     api.post<{ scenario: string; message: string }>(`/simulateur/scenarios/${nom}`),
+  reset: () => api.post<{ ok: boolean; message: string }>("/simulateur/reset"),
 }
+
 
 // --------------------------- Arrêts --------------------------- //
 export const downtimeApi = {

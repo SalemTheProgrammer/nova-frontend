@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { CheckCircle2, FlaskConical, Radio } from "lucide-react"
+import { CheckCircle2, FlaskConical, Radio, RotateCcw } from "lucide-react"
 import {
   Area,
   AreaChart,
@@ -11,7 +11,7 @@ import {
   YAxis,
 } from "recharts"
 import { useDashboardData } from "@/hooks/useDashboardData"
-import { lignesApi } from "@/lib/api"
+import { lignesApi, simulatorApi } from "@/lib/api"
 import type { LigneProduction } from "@/lib/types"
 import { SegmentedBlockGauge } from "@/components/dashboard/SegmentedBlockGauge"
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton"
@@ -58,49 +58,66 @@ export function MesDashboardPage({
   const [lignes, setLignes] = useState<LigneProduction[]>([])
   const [sparkplugOpen, setSparkplugOpen] = useState(false)
   const [prelevementOpen, setPrelevementOpen] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
 
   useEffect(() => {
     lignesApi.list().then(setLignes).catch(() => {})
   }, [])
 
-  // Rendement global calculé ou valeur de référence optimale
+  async function handleReset() {
+    if (!window.confirm("Voulez-vous vraiment réinitialiser toutes les métriques de production et compteurs à zéro ?")) {
+      return
+    }
+    try {
+      setIsResetting(true)
+      await simulatorApi.reset()
+      await refresh()
+    } catch (e) {
+      console.error("Erreur lors de la réinitialisation de l'atelier", e)
+    } finally {
+      setIsResetting(false)
+    }
+  }
+
+  // Rendement global calculé ou 0 si à l'arrêt/reset
   const parsedTrs = Number(resume?.trs_global ?? 0)
   const trsPercentage = Math.round(
     parsedTrs > 0 && parsedTrs <= 1
       ? parsedTrs * 100
       : parsedTrs > 1
         ? parsedTrs
-        : 84
+        : 0
   )
 
   // Machines réelles ou postes de référence
   const machinesAffichees = machines.length > 0
-    ? machines.slice(0, 3).map((m, idx) => ({
+    ? machines.slice(0, 3).map((m) => ({
         code: m.code,
         nom: m.nom,
         statut: m.statut === "MARCHE" ? "En marche" : (m.statut === "PANNE" ? "En panne" : "À l'arrêt"),
-        cadence: m.temps_cycle_actuel_s ? `${Math.round(60 / Number(m.temps_cycle_actuel_s))} cpm` : "120 cpm",
-        rendement: m.trs && Number(m.trs) > 0 ? `${Math.round(Number(m.trs) * 100)}%` : `${84 - idx * 3}%`,
+        cadence: m.temps_cycle_actuel_s ? `${Math.round(60 / Number(m.temps_cycle_actuel_s))} cpm` : "0 cpm",
+        rendement: m.trs != null && Number(m.trs) > 0 ? `${Math.round(Number(m.trs) * 100)}%` : "0%",
         enMarche: m.statut === "MARCHE",
       }))
     : [
-        { code: "Poste 1", nom: "Comprimeuse Rotative", statut: "En marche", cadence: "120 cpm", rendement: "84%", enMarche: true },
-        { code: "Poste 2", nom: "Ligne Blistrière", statut: "En marche", cadence: "118 cpm", rendement: "81%", enMarche: true },
-        { code: "Poste 3", nom: "Compteuse & Remplisseuse", statut: "En marche", cadence: "122 cpm", rendement: "86%", enMarche: true },
+        { code: "Poste 1", nom: "Comprimeuse Rotative", statut: "À l'arrêt", cadence: "0 cpm", rendement: "0%", enMarche: false },
+        { code: "Poste 2", nom: "Ligne Blistrière", statut: "À l'arrêt", cadence: "0 cpm", rendement: "0%", enMarche: false },
+        { code: "Poste 3", nom: "Compteuse & Remplisseuse", statut: "À l'arrêt", cadence: "0 cpm", rendement: "0%", enMarche: false },
       ]
 
-  // Statistiques de production intuitives (données réelles si > 0, sinon valeurs réalistes)
+  // Statistiques de production réelles
   const rawCible = Number(resume?.production_cible ?? 0)
   const rawBonne = Number(resume?.quantite_bonne ?? 0)
   const rawRejet = Number(resume?.quantite_rejetee ?? 0)
 
-  const prodCible = rawCible > 0 ? rawCible : 5000
-  const prodBonne = rawBonne > 0 ? rawBonne : 3680
-  const prodRejet = rawRejet > 0 ? rawRejet : 24
+  const prodCible = rawCible
+  const prodBonne = rawBonne
+  const prodRejet = rawRejet
   const prodTotale = prodBonne + prodRejet
-  const avancementPct = Math.min(100, Math.round((prodTotale / prodCible) * 100))
-  const tauxConformite = prodTotale > 0 ? ((prodBonne / prodTotale) * 100).toFixed(1) : "99.4"
-  const tauxRejet = prodTotale > 0 ? ((prodRejet / prodTotale) * 100).toFixed(1) : "0.6"
+  const avancementPct = prodCible > 0 ? Math.min(100, Math.round((prodTotale / prodCible) * 100)) : 0
+  const tauxConformite = prodTotale > 0 ? ((prodBonne / prodTotale) * 100).toFixed(1) : "100.0"
+  const tauxRejet = prodTotale > 0 ? ((prodRejet / prodTotale) * 100).toFixed(1) : "0.0"
+
 
   const ofActif = resume?.of_actif
   const nomLigneActive = lignes.find((l) => l.id === ligneId)?.designation
@@ -147,8 +164,18 @@ export function MesDashboardPage({
           </div>
         </div>
 
-        {/* Boutons d'action : Sparkplug B IoT & Prélèvements MP BPF */}
+        {/* Boutons d'action : Reset, Sparkplug B IoT & Prélèvements MP BPF */}
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleReset}
+            disabled={isResetting}
+            className="inline-flex items-center gap-1.5 rounded-full border border-red-200/90 bg-red-50/80 hover:bg-red-100/90 px-3 py-1 text-xs font-bold text-red-700 shadow-xs transition dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300 disabled:opacity-50 cursor-pointer"
+            title="Remettre tous les compteurs, arrêts et événements de l'atelier à 0"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 text-red-600 dark:text-red-400 ${isResetting ? "animate-spin" : ""}`} />
+            <span>{isResetting ? "Reset…" : "Remise à zéro"}</span>
+          </button>
+
           <button
             onClick={() => setPrelevementOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-full border border-blue-200/80 bg-blue-50/70 hover:bg-blue-100/80 px-3 py-1 text-xs font-bold text-blue-800 shadow-[0_2px_8px_-2px_rgba(37,99,235,0.1)] transition dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300"
