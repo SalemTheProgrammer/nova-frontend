@@ -11,7 +11,7 @@ export function MachinesPage({ ligneId }: { ligneId: number | null }) {
 
   if (selectedId != null) {
     return (
-      <Page title="Détail machine">
+      <Page title="Détail Machine">
         <MachineDetailsPage machineId={selectedId} onBack={() => setSelectedId(null)} />
       </Page>
     )
@@ -20,7 +20,7 @@ export function MachinesPage({ ligneId }: { ligneId: number | null }) {
   const machines = data ?? []
 
   return (
-    <Page title="Machines" description="Liste des machines et leur état SCADA en direct.">
+    <Page title="Machines & Postes" description="Liste des machines et leur état SCADA en direct.">
       <ErrorBanner message={error} />
       {loading ? (
         <EmptyState message="Chargement…" />

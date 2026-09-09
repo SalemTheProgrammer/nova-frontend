@@ -114,7 +114,7 @@ export function ArticlesPage() {
 
   return (
     <Page
-      title="Articles"
+      title="Catalogue Articles & Recettes"
       description="Produits finis fabricables et leur formule (nomenclature)."
       actions={
         <Button onClick={openCreate}>

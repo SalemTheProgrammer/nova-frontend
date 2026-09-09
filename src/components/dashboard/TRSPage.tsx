@@ -56,7 +56,7 @@ export function TRSPage({ ligneId }: { ligneId: number | null }) {
 
   return (
     <Page
-      title="TRS"
+      title="TRS & Pertes de Rendement"
       description="Taux de Rendement Synthétique (AFNOR NF E60-182) — calculé à la demande depuis le journal d'événements."
     >
       <div className="mb-4 flex flex-wrap items-end gap-3">

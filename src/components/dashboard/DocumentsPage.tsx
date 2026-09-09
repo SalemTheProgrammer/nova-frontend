@@ -110,7 +110,7 @@ export function DocumentsPage({
 
   return (
     <Page
-      title="Documents"
+      title="Documentation Technique & BPF"
       description="Base documentaire (normes BPF/GMP, procédures, manuels machines, fiches techniques…) indexée pour le RAG de l'agent."
       actions={
         <Button onClick={() => setOpen(true)}>

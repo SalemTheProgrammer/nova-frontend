@@ -15,9 +15,16 @@ import type {
   LigneProduction,
   Lot,
   LotDetail,
+  LotQuarantaine,
   Machine,
   MachineEvent,
   MaintenanceEventRead,
+  PrelevementMP,
+  SparkplugDevice,
+  SparkplugTagMapping,
+  TagTransformation,
+  TargetKpi,
+  Unite,
   DocumentRag,
   DocumentSearchResult,
   LigneFlux,
@@ -565,3 +572,59 @@ export const adminApi = {
   ) => api.patch<User>(`/admin/users/${id}`, data),
   deleteUser: (id: number) => api.del(`/admin/users/${id}`),
 }
+
+// --------------------------- Sparkplug B & IoT --------------------------- //
+export const sparkplugApi = {
+  getDevices: () => api.get<SparkplugDevice[]>("/sparkplug/devices"),
+  getDevice: (id: number) => api.get<SparkplugDevice>(`/sparkplug/devices/${id}`),
+  updateMapping: (
+    deviceId: number,
+    data: {
+      tag_name: string
+      target_kpi: TargetKpi
+      transformation: TagTransformation
+      formula_param?: string | null
+      description?: string | null
+      actif?: boolean
+    },
+  ) => api.post<SparkplugTagMapping>(`/sparkplug/devices/${deviceId}/mappings`, data),
+  deleteMapping: (deviceId: number, mappingId: number) =>
+    api.del(`/sparkplug/devices/${deviceId}/mappings/${mappingId}`),
+  birth: () => api.post<Record<string, unknown>>("/sparkplug/simulator/birth"),
+  tick: (data?: {
+    good_increment?: number
+    reject_increment?: number
+    cadence_cpm?: number
+    temperature?: number
+    operator_card?: string
+  }) => api.post<Record<string, unknown>>("/sparkplug/simulator/tick", data ?? {}),
+  unplannedStop: () => api.post<Record<string, unknown>>("/sparkplug/simulator/unplanned-stop"),
+  swipeCard: (card_code: string) =>
+    api.post<Record<string, unknown>>("/sparkplug/simulator/swipe-card", { card_code }),
+  startStream: () => api.post<Record<string, unknown>>("/sparkplug/simulator/start-stream"),
+  stopStream: () => api.post<Record<string, unknown>>("/sparkplug/simulator/stop-stream"),
+  status: () => api.get<{ is_streaming: boolean }>("/sparkplug/simulator/status"),
+}
+
+// --------------------- Prélèvements Matières Premières (BPF) --------------------- //
+export const prelevementApi = {
+  lister: () => api.get<PrelevementMP[]>("/prelevements"),
+  lotsQuarantaine: () => api.get<LotQuarantaine[]>("/prelevements/lots-en-quarantaine"),
+  creer: (data: {
+    lot_id: number
+    quantite_prelevee: number | string
+    unite?: Unite
+    preleveur: string
+    zone_prelevement?: string
+  }) => api.post<PrelevementMP>("/prelevements", data),
+  valider: (
+    id: number,
+    data: {
+      conforme: boolean
+      analyste: string
+      bulletin_analyse_ref: string
+      commentaire?: string
+    },
+  ) => api.post<PrelevementMP>(`/prelevements/${id}/valider`, data),
+}
+

@@ -8,8 +8,10 @@
  * le rejoue dès que le panneau enregistre son handler (même pattern que twinBus).
  */
 type Handler = (texte: string) => void
+type OpenHandler = () => void
 
 let handler: Handler | null = null
+let openHandler: OpenHandler | null = null
 const pending: string[] = []
 
 export const aiChatBus = {
@@ -19,7 +21,14 @@ export const aiChatBus = {
       while (pending.length) h(pending.shift()!)
     }
   },
+  setOpenHandler(oh: OpenHandler | null) {
+    openHandler = oh
+  },
+  open() {
+    if (openHandler) openHandler()
+  },
   emit(texte: string) {
+    if (openHandler) openHandler()
     if (handler) handler(texte)
     else pending.push(texte)
   },

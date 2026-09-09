@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { ChevronDown, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -17,6 +17,12 @@ export function Page({
   fullHeight?: boolean
   className?: string
 }) {
+  useEffect(() => {
+    if (title) {
+      document.title = `${title} — Nova`
+    }
+  }, [title])
+
   const hasHeader = Boolean(title) || Boolean(actions)
   if (fullHeight) {
     return (

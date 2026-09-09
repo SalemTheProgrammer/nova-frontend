@@ -11,7 +11,7 @@ export function QualitePage() {
 
   return (
     <Page
-      title="Qualité"
+      title="Contrôle Qualité & Rejets"
       description="Suivi des bonnes pièces et rebuts, et de leur cause — impact direct sur TQ."
     >
       <ErrorBanner message={resume.error ?? evenements.error} />

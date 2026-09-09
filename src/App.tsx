@@ -45,6 +45,25 @@ const NAV_VIEWS: NavView[] = [
   "assistant",
 ]
 
+export const VIEW_TITLES: Record<NavView, string> = {
+  dashboard: "Tableau de bord MES",
+  machines: "Machines & Postes",
+  jumeau: "Jumeau Numérique 3D",
+  trs: "TRS & Pertes de Rendement",
+  arrets: "Journal des Arrêts",
+  qualite: "Contrôle Qualité & Rejets",
+  maintenance: "Maintenance & Interventions",
+  stock: "Gestion des Stocks",
+  ordres: "Ordres de Fabrication",
+  articles: "Catalogue Articles & Recettes",
+  matieres: "Matières Premières",
+  lignes: "Lignes de Production",
+  fournisseurs: "Fournisseurs",
+  documents: "Documentation Technique & BPF",
+  simulateur: "Simulateur de Production",
+  assistant: "Assistant Vocal Nova",
+}
+
 function isNavView(value: string | undefined): value is NavView {
   return !!value && (NAV_VIEWS as string[]).includes(value)
 }
@@ -56,6 +75,18 @@ function AppContent({ view }: { view: NavView }) {
   const [docFocus, setDocFocus] = useState<DocumentFocus | null>(null)
   const [aiPanelOpen, setAiPanelOpen] = useState(false)
   const [twinFullscreen, setTwinFullscreen] = useState(false)
+
+  // Permet à tout composant (ou bouton AI) d'ouvrir le panneau Nova
+  useEffect(() => {
+    aiChatBus.setOpenHandler(() => setAiPanelOpen(true))
+    return () => aiChatBus.setOpenHandler(null)
+  }, [])
+
+  // Met à jour le titre de l'onglet du navigateur
+  useEffect(() => {
+    const titre = VIEW_TITLES[view] || "Supervision"
+    document.title = `${titre} — Nova`
+  }, [view])
 
   // Le jumeau numérique se pilote via Nova : on ouvre l'assistant à droite
   // dès qu'on arrive sur cette page. Quitter la page quitte le plein écran.

@@ -620,3 +620,82 @@ export interface DashboardResume {
   micro_arrets_nombre: number
   matieres_consommees: MatiereConsommee[]
 }
+
+// --------------------------- Sparkplug B & IoT --------------------------- //
+
+export type TargetKpi =
+  | "BONNES_PIECES"
+  | "REJETS"
+  | "CADENCE"
+  | "STATUT_MACHINE"
+  | "TEMPERATURE"
+  | "VIBRATION"
+  | "OPERATOR_CARD"
+  | "CAUSE_ARRET"
+
+export type TagTransformation =
+  | "DIRECT"
+  | "SCALE_FACTOR"
+  | "THRESHOLD_STATE"
+  | "DELTA"
+  | "OPERATOR_CARD"
+
+export interface SparkplugTagMapping {
+  id: number
+  device_id: number
+  tag_name: string
+  target_kpi: TargetKpi
+  transformation: TagTransformation
+  formula_param?: string | null
+  description?: string | null
+  actif: boolean
+}
+
+export interface SparkplugDevice {
+  id: number
+  name: string
+  group_id: string
+  edge_node_id: string
+  device_id: string
+  machine_id: number | null
+  online: boolean
+  last_birth_at: string | null
+  last_data_at: string | null
+  available_metrics?: Record<string, { dataType: string; valeur_initiale: unknown }> | null
+  mappings: SparkplugTagMapping[]
+}
+
+// ----------------------- Prélèvements Matière Première (BPF) ----------------------- //
+
+export type StatutPrelevement = "EN_ATTENTE_CQ" | "CONFORME" | "NON_CONFORME"
+
+export interface PrelevementMP {
+  id: number
+  numero: string
+  lot_matiere_premiere_id: number
+  numero_lot?: string | null
+  code_matiere?: string | null
+  nom_matiere?: string | null
+  quantite_prelevee: string
+  unite: Unite
+  preleveur: string
+  zone_prelevement: string
+  date_prelevement: string
+  statut: StatutPrelevement
+  date_analyse?: string | null
+  analyste?: string | null
+  bulletin_analyse_ref?: string | null
+  commentaire?: string | null
+}
+
+export interface LotQuarantaine {
+  id: number
+  numero_lot: string
+  code_matiere: string
+  nom_matiere: string
+  quantite_actuelle: number
+  unite: string
+  statut: string
+  date_peremption?: string | null
+}
+

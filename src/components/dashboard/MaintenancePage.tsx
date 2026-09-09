@@ -14,7 +14,7 @@ export function MaintenancePage() {
 
   return (
     <Page
-      title="Maintenance"
+      title="Maintenance & Interventions"
       description="Historique des interventions de maintenance (préventive, corrective, urgence)."
     >
       <ErrorBanner message={error} />

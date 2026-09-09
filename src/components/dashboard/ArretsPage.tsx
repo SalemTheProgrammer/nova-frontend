@@ -84,7 +84,7 @@ export function ArretsPage() {
 
   return (
     <Page
-      title="Arrêts"
+      title="Journal des Arrêts"
       description="Suivi des arrêts machine — actifs et historique, avec cause et impact sur la disponibilité."
       actions={
         <Button variant="outline" onClick={reload}>

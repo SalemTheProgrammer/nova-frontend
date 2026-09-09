@@ -131,7 +131,7 @@ export function MatieresPage() {
 
   return (
     <Page
-      title="Matières premières"
+      title="Matières Premières"
       description="Stock lot par lot avec traçabilité et péremption (FEFO)."
       actions={
         <Button onClick={openCreate}>

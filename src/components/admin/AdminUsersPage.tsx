@@ -39,6 +39,10 @@ export function AdminUsersPage() {
   const groupes = useMemo(() => grouperOutils(tools), [tools])
   const selected = users.find((u) => u.id === selectedId) ?? null
 
+  useEffect(() => {
+    document.title = "Administration Utilisateurs — Nova"
+  }, [])
+
   async function recharger() {
     setChargement(true)
     try {

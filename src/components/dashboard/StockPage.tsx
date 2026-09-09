@@ -148,7 +148,7 @@ export function StockPage() {
 
   return (
     <Page
-      title="Stock"
+      title="Gestion des Stocks"
       description="Vue d'ensemble et gestion des lots de matières premières."
       actions={
         <div className="flex gap-2">

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react"
 import { Menu, Sparkles } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { Sidebar, type NavView } from "@/components/Sidebar"
 import { RightAIAgent } from "@/components/layout/RightAIAgent"
 import type { DocumentPassage } from "@/lib/types"
@@ -66,7 +67,7 @@ export function AppShell({
   }, [aiPanelOpen])
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-background">
+    <div className="flex h-dvh overflow-hidden bg-muted/40 dark:bg-zinc-950">
       <Sidebar
         view={view}
         onChange={handleNavigate}
@@ -75,7 +76,7 @@ export function AppShell({
         ligneId={ligneId}
         onChangeLigne={onChangeLigne}
       />
-      <div className="relative flex min-w-0 flex-1 overflow-hidden">
+      <div className="relative flex min-w-0 flex-1 overflow-hidden m-2 md:m-0 md:my-3 md:mr-3 md:ml-3 rounded-2xl border border-border/80 bg-background/95 backdrop-blur-sm shadow-xl">
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-3 md:hidden">
             <button
@@ -86,7 +87,7 @@ export function AppShell({
             >
               <Menu className="size-4" />
             </button>
-            <img src="/favicon.svg" alt="" className="size-7 rounded-lg" />
+            <img src="/nova-logo.png" alt="Nova" className="size-7 rounded-lg object-contain" />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold leading-tight">Nova MES</p>
               <p className="truncate text-[11px] text-muted-foreground">Supervision de production</p>
@@ -125,26 +126,47 @@ export function AppShell({
           ))}
       </div>
 
-      {/* Bouton flottant Nova : grande pilule violette lumineuse (dégradé + reflet
-          + étincelles), masquée quand le panneau est ouvert — celui-ci a déjà son
-          propre bouton de fermeture dans l'en-tête. */}
+      {/* Bouton vertical Nova AI ancré au bord droit, centré verticalement, avec logo Nova */}
       {!aiPanelOpen && (
         <button
+          type="button"
           onClick={() => setAiPanelOpen(true)}
-          className={`nova-fab fixed bottom-8 right-8 z-50 animate-in fade-in zoom-in-90 duration-200 ${sidebarOpen ? "hidden md:block" : ""}`}
+          title="Ouvrir le copilote Nova AI"
+          aria-label="Ouvrir le copilote Nova AI"
+          className={cn(
+            "fixed right-0 top-1/2 -translate-y-1/2 z-50 group flex flex-col items-center gap-2.5 py-3 px-2",
+            "rounded-l-2xl border-l border-y border-violet-400/40",
+            "bg-gradient-to-b from-violet-600 via-indigo-700 to-violet-950",
+            "shadow-[0_4px_24px_rgba(124,58,237,0.45)] backdrop-blur-xl",
+            "transition-all duration-300 ease-out hover:-translate-x-1.5 hover:shadow-[0_6px_32px_rgba(139,92,246,0.6)]",
+            "cursor-pointer select-none",
+          )}
         >
-          <span className="relative z-10 flex items-center gap-3 text-xl font-semibold text-white">
-            Nova
-            <Sparkles className="nova-fab-sparkle size-6" />
-            {pending.length > 0 && (
-              <span className="relative inline-flex size-6">
-                <span className="absolute inset-0 animate-ping rounded-full bg-white opacity-50" />
-                <span className="relative inline-flex size-6 items-center justify-center rounded-full bg-white text-xs font-bold text-violet-700">
-                  {pending.length}
-                </span>
-              </span>
-            )}
-          </span>
+          {/* Logo Nova Badge avec effet de verre */}
+          <div className="relative flex size-7 items-center justify-center rounded-xl bg-white/15 p-1 backdrop-blur-md shadow-inner ring-1 ring-white/30 transition-transform group-hover:scale-110">
+            <img
+              src="/nova-logo.png"
+              alt="Nova AI"
+              className="size-full object-contain drop-shadow"
+            />
+            {/* LED verte pulsation live */}
+            <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-emerald-400 ring-2 ring-violet-700 animate-pulse" />
+          </div>
+
+          {/* Label vertical Nova AI */}
+          <div className="flex flex-col items-center gap-1">
+            <span className="[writing-mode:vertical-rl] rotate-180 text-[11px] font-black uppercase tracking-widest text-white drop-shadow-sm font-mono">
+              NOVA AI
+            </span>
+            <Sparkles className="size-3 text-violet-200 animate-pulse" />
+          </div>
+
+          {/* Badge de notifications de propositions */}
+          {pending.length > 0 && (
+            <span className="flex size-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-extrabold text-white shadow-md ring-2 ring-violet-900 animate-bounce">
+              {pending.length}
+            </span>
+          )}
         </button>
       )}
     </div>

@@ -164,7 +164,7 @@ export function SimulateurPage() {
   return (
     <Page
       fullHeight
-      title="Simulateur"
+      title="Simulateur de Production"
       description="Piloter une ligne : machines, incidents, réaction de Nova."
     >
       <div className="flex h-full flex-col gap-4 overflow-hidden">

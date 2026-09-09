@@ -5,7 +5,7 @@ import {
   AlertTriangle,
   BookOpen,
   Boxes,
-  ChevronDown,
+  Check,
   ClipboardList,
   Factory,
   FlaskConical,
@@ -13,8 +13,6 @@ import {
   LogOut,
   MessageSquare,
   Package,
-  PanelLeftClose,
-  PanelLeftOpen,
   ShieldCheck,
   SlidersHorizontal,
   Truck,
@@ -22,6 +20,7 @@ import {
   Wifi,
   WifiOff,
   Wrench,
+  X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { lignesApi } from "@/lib/api"
@@ -51,39 +50,141 @@ export type NavView =
 interface NavItem {
   view: NavView
   label: string
+  description: string
   icon: typeof LayoutDashboard
 }
 
-const GROUPES_PRINCIPAUX: { titre: string; items: NavItem[] }[] = [
-  {
-    titre: "Pilotage",
-    items: [
-      { view: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { view: "machines", label: "Machines", icon: Factory },
-      { view: "ordres", label: "Ordres de fabrication", icon: ClipboardList },
-      { view: "jumeau", label: "Jumeau numérique", icon: Boxes },
-      { view: "assistant", label: "Assistant Nova", icon: MessageSquare },
-    ],
-  },
-  {
-    titre: "Analyse",
-    items: [
-      { view: "trs", label: "TRS", icon: Activity },
-      { view: "arrets", label: "Arrêts", icon: AlertTriangle },
-      { view: "qualite", label: "Qualité", icon: ShieldCheck },
-      { view: "maintenance", label: "Maintenance", icon: Wrench },
-    ],
-  },
-]
+type DrawerCategory = "pilotage" | "analyse" | "ressources" | "lignes" | null
 
-const RESSOURCES: NavItem[] = [
-  { view: "stock", label: "Stock", icon: Package },
-  { view: "articles", label: "Articles", icon: Package },
-  { view: "matieres", label: "Matières premières", icon: FlaskConical },
-  { view: "lignes", label: "Lignes", icon: Factory },
-  { view: "fournisseurs", label: "Fournisseurs", icon: Truck },
-  { view: "documents", label: "Documents", icon: BookOpen },
-  { view: "simulateur", label: "Simulateur", icon: SlidersHorizontal },
+interface CategoryConfig {
+  id: "pilotage" | "analyse" | "ressources"
+  titre: string
+  badge: string
+  icon: typeof LayoutDashboard
+  items: NavItem[]
+}
+
+const CATEGORIES: CategoryConfig[] = [
+  {
+    id: "pilotage",
+    titre: "Pilotage d'Atelier",
+    badge: "Opérations",
+    icon: LayoutDashboard,
+    items: [
+      {
+        view: "dashboard",
+        label: "Tableau de bord",
+        description: "Vue d'ensemble et KPIs de production en temps réel",
+        icon: LayoutDashboard,
+      },
+      {
+        view: "machines",
+        label: "Machines & Postes",
+        description: "Cadences, capteurs IoT et état des postes",
+        icon: Factory,
+      },
+      {
+        view: "ordres",
+        label: "Ordres de fabrication",
+        description: "Planification et état d'avancement des OFs",
+        icon: ClipboardList,
+      },
+      {
+        view: "jumeau",
+        label: "Jumeau numérique 3D",
+        description: "Visualisation 3D interactive de la ligne",
+        icon: Boxes,
+      },
+      {
+        view: "assistant",
+        label: "Assistant Nova",
+        description: "Copilote vocal et agent IA autonome",
+        icon: MessageSquare,
+      },
+    ],
+  },
+  {
+    id: "analyse",
+    titre: "Performance & Analyse",
+    badge: "Métriques",
+    icon: Activity,
+    items: [
+      {
+        view: "trs",
+        label: "TRS & Rendement",
+        description: "Taux de Rendement Synthétique, B/P/Q",
+        icon: Activity,
+      },
+      {
+        view: "arrets",
+        label: "Journal des arrêts",
+        description: "Micro-arrêts, causes de panne et Pareto",
+        icon: AlertTriangle,
+      },
+      {
+        view: "qualite",
+        label: "Contrôle Qualité",
+        description: "Rejets, conformité BPF et échantillons",
+        icon: ShieldCheck,
+      },
+      {
+        view: "maintenance",
+        label: "Maintenance & GMAO",
+        description: "Interventions curatives et préventives",
+        icon: Wrench,
+      },
+    ],
+  },
+  {
+    id: "ressources",
+    titre: "Ressources & Logistique",
+    badge: "Atelier",
+    icon: Package,
+    items: [
+      {
+        view: "stock",
+        label: "Stocks Produits",
+        description: "Niveaux de stocks et seuils d'alerte",
+        icon: Package,
+      },
+      {
+        view: "articles",
+        label: "Articles & Recettes",
+        description: "Nomenclatures et spécifications articles",
+        icon: Package,
+      },
+      {
+        view: "matieres",
+        label: "Matières premières",
+        description: "Traçabilité des lots et consommations",
+        icon: FlaskConical,
+      },
+      {
+        view: "lignes",
+        label: "Lignes de production",
+        description: "Configuration technique des lignes",
+        icon: Factory,
+      },
+      {
+        view: "fournisseurs",
+        label: "Fournisseurs",
+        description: "Gestion des partenaires et réceptions",
+        icon: Truck,
+      },
+      {
+        view: "documents",
+        label: "Documentation BPF",
+        description: "Procédures opératoires et fiches techniques",
+        icon: BookOpen,
+      },
+      {
+        view: "simulateur",
+        label: "Simulateur d'usine",
+        description: "Génération de flux et scénarios de charge",
+        icon: SlidersHorizontal,
+      },
+    ],
+  },
 ]
 
 interface SidebarProps {
@@ -95,37 +196,9 @@ interface SidebarProps {
   onChangeLigne: (id: number | null) => void
 }
 
-function NavigationButton({
-  item,
-  active,
-  onClick,
-}: {
-  item: NavItem
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors",
-        active
-          ? "bg-sidebar-primary font-semibold text-sidebar-primary-foreground shadow-sm"
-          : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60",
-      )}
-    >
-      <item.icon className="size-4 shrink-0" />
-      <span className="truncate">{item.label}</span>
-    </button>
-  )
-}
-
 export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne }: SidebarProps) {
   const [lignes, setLignes] = useState<LigneProduction[]>([])
-  const [resourcesOpen, setResourcesOpen] = useState(() =>
-    RESSOURCES.some((item) => item.view === view),
-  )
+  const [activeDrawer, setActiveDrawer] = useState<DrawerCategory>(null)
   const { connected } = useWebSocket()
   const { user, logout } = useAuth()
   const navigate = useNavigate()
@@ -134,254 +207,383 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
     lignesApi.list().then(setLignes).catch(() => {})
   }, [])
 
+  // Fermer le drawer avec la touche Echap
   useEffect(() => {
-    if (RESSOURCES.some((item) => item.view === view)) setResourcesOpen(true)
-  }, [view])
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setActiveDrawer(null)
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [])
 
-  // Filtre les entrées de nav selon le périmètre d'outils du numéro connecté
-  // (voir lib/permissions.ts) — un compte restreint ne doit pas voir de lien
-  // vers une page dont l'API lui refusera l'accès.
-  const groupesPrincipauxVisibles = GROUPES_PRINCIPAUX.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => canAccessView(user, item.view)),
-  })).filter((group) => group.items.length > 0)
-  const ressourcesVisibles = RESSOURCES.filter((item) => canAccessView(user, item.view))
-  const railItems = groupesPrincipauxVisibles.flatMap((group) => group.items)
+  // Trouve la catégorie à laquelle appartient la vue courante
+  const currentCategory = CATEGORIES.find((cat) =>
+    cat.items.some((item) => item.view === view),
+  )?.id
+
+  // Filtre les items accessibles pour l'utilisateur
+  const categoriesVisibles = CATEGORIES.map((cat) => ({
+    ...cat,
+    items: cat.items.filter((item) => canAccessView(user, item.view)),
+  })).filter((cat) => cat.items.length > 0)
+
+  function toggleCategory(catId: DrawerCategory) {
+    setActiveDrawer((prev) => (prev === catId ? null : catId))
+  }
+
+  function handleSelectView(nextView: NavView) {
+    onChange(nextView)
+    setActiveDrawer(null)
+  }
+
+  function getActiveLineLabel() {
+    if (!ligneId) return "Toutes les lignes"
+    const l = lignes.find((item) => item.id === ligneId)
+    return l ? l.designation : "Ligne sélectionnée"
+  }
+
+  const activeCategoryData = categoriesVisibles.find((c) => c.id === activeDrawer)
 
   return (
     <>
+      {/* Fond mobile si ouvert */}
       {open && (
-        <button
-          type="button"
-          aria-label="Fermer le menu"
+        <div
+          className="fixed inset-0 z-30 bg-black/40 backdrop-blur-xs md:hidden"
           onClick={onToggle}
-          className="fixed inset-0 z-30 bg-black/30 backdrop-blur-[1px] md:hidden"
+          aria-hidden="true"
         />
       )}
 
+      {/* =========================================================================
+          Rail latéral flottant : Uniquement des icônes, marges et border-radius
+         ========================================================================= */}
       <aside
+        aria-label="Navigation principale"
         className={cn(
-          "group/rail fixed inset-y-0 left-0 z-40 flex h-dvh w-72 shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar shadow-xl",
-          "transition-[width,transform] duration-300 ease-in-out md:relative md:inset-auto md:z-auto md:shadow-none",
-          open ? "translate-x-0 md:w-[17rem]" : "-translate-x-full md:w-16 md:translate-x-0",
+          "relative z-30 my-3 ml-3 flex h-[calc(100dvh-1.5rem)] w-16 shrink-0 flex-col items-center justify-between",
+          "rounded-2xl border border-border/80 bg-card/95 p-2.5 shadow-xl backdrop-blur-xl transition-all",
+          // Sur mobile uniquement : position fixed en overlay quand ouvert
+          "max-md:fixed max-md:left-0 max-md:top-0 max-md:z-40 max-md:shadow-2xl",
+          !open && "max-md:hidden",
         )}
       >
-        <div
-          aria-hidden={open}
-          inert={open}
-          className={cn(
-            "absolute inset-0 hidden flex-col items-center py-4 transition-opacity duration-150 md:flex",
-            open ? "pointer-events-none opacity-0" : "opacity-100 delay-150",
-          )}
-        >
+        {/* Partie Haute : Logo seul + Icônes principales */}
+        <div className="flex w-full flex-col items-center gap-2">
+          {/* Logo Nova icon-only (sans boîte ni bordure, uniquement le glyphe violet) */}
           <button
             type="button"
-            onClick={onToggle}
-            aria-label="Afficher le menu"
-            title="Afficher le menu"
-            className="mb-3 flex size-10 shrink-0 items-center justify-center rounded-xl text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+            onClick={() => handleSelectView("dashboard")}
+            title="Nova MES"
+            className="group relative flex size-10 items-center justify-center transition-transform hover:scale-110 active:scale-95"
           >
-            <PanelLeftOpen className="size-4" />
+            <img
+              src="/nova-logo.png"
+              alt="Nova"
+              className="size-8 object-contain"
+            />
           </button>
 
-          <nav className="flex flex-1 flex-col items-center gap-1 overflow-y-auto px-2">
-            {railItems.map((item) => (
-              <div key={item.view} className="group/item relative">
-                <button
-                  type="button"
-                  onClick={() => onChange(item.view)}
-                  aria-label={item.label}
-                  className={cn(
-                    "flex size-10 items-center justify-center rounded-xl transition-colors",
-                    view === item.view
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
-                  )}
-                >
-                  <item.icon className="size-4" />
-                </button>
-                <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-neutral-900 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover/item:opacity-100">
-                  {item.label}
-                </span>
-              </div>
-            ))}
-          </nav>
+          {/* Icônes des catégories principales */}
+          <nav className="flex flex-col items-center gap-1.5 pt-1" aria-label="Sections principales">
+            {categoriesVisibles.map((cat) => {
+              const isSelectedCategory = currentCategory === cat.id
+              const isDrawerOpen = activeDrawer === cat.id
 
-          <div className="flex flex-col items-center gap-1">
-            {user?.is_admin && (
+              return (
+                <div key={cat.id} className="group relative">
+                  <button
+                    type="button"
+                    onClick={() => toggleCategory(cat.id)}
+                    aria-label={cat.titre}
+                    className={cn(
+                      "flex size-11 items-center justify-center rounded-xl transition-all",
+                      isDrawerOpen
+                        ? "bg-violet-600 text-white shadow-md shadow-violet-600/30 scale-105"
+                        : isSelectedCategory
+                          ? "bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 ring-1 ring-violet-500/30"
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    )}
+                  >
+                    <cat.icon className="size-5" />
+                  </button>
+
+                  {/* Tooltip au survol */}
+                  <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+                    {cat.titre}
+                  </span>
+                </div>
+              )
+            })}
+          </nav>
+        </div>
+
+        {/* Partie Basse : Ligne active, Admin, WebSocket & Logout */}
+        <div className="flex w-full flex-col items-center gap-2">
+          {/* Bouton sélecteur de ligne */}
+          <div className="group relative">
+            <button
+              type="button"
+              onClick={() => toggleCategory("lignes")}
+              title={`Ligne : ${getActiveLineLabel()}`}
+              className={cn(
+                "flex size-11 items-center justify-center rounded-xl transition-all",
+                activeDrawer === "lignes"
+                  ? "bg-violet-600 text-white shadow-md shadow-violet-600/30"
+                  : ligneId
+                    ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 ring-1 ring-emerald-500/30"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+              )}
+            >
+              <Factory className="size-5" />
+              {ligneId && (
+                <span className="absolute right-2 top-2 size-2 rounded-full bg-emerald-500" />
+              )}
+            </button>
+            <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+              Lignes ({getActiveLineLabel()})
+            </span>
+          </div>
+
+          {/* Admin si autorisé */}
+          {user?.is_admin && (
+            <div className="group relative">
               <button
                 type="button"
                 onClick={() => navigate("/admin")}
-                aria-label="Administration"
                 title="Administration"
-                className="flex size-10 items-center justify-center rounded-xl text-violet-600 transition-colors hover:bg-sidebar-accent/60 dark:text-violet-400"
+                className="flex size-11 items-center justify-center rounded-xl text-violet-600 transition-all hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/50"
               >
-                <UserCog className="size-4" />
+                <UserCog className="size-5" />
               </button>
+              <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+                Administration
+              </span>
+            </div>
+          )}
+
+          {/* Témoin WebSocket */}
+          <div
+            className="flex size-7 items-center justify-center rounded-full"
+            title={connected ? "Flux temps réel actif" : "Flux temps réel interrompu"}
+          >
+            {connected ? (
+              <Wifi className="size-4 text-emerald-500" />
+            ) : (
+              <WifiOff className="size-4 text-destructive" />
             )}
-            {user && (
+          </div>
+
+          <div className="h-px w-8 bg-border/80" />
+
+          {/* Déconnexion */}
+          {user && (
+            <div className="group relative">
               <button
                 type="button"
                 onClick={logout}
-                aria-label="Déconnexion"
                 title="Déconnexion"
-                className="flex size-10 items-center justify-center rounded-xl text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+                className="flex size-11 items-center justify-center rounded-xl text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive active:scale-95"
               >
-                <LogOut className="size-4" />
+                <LogOut className="size-5" />
               </button>
-            )}
-            <div className="my-1" title={connected ? "Connecté" : "Déconnecté"}>
-              {connected ? (
-                <Wifi className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-              ) : (
-                <WifiOff className="size-3.5 text-destructive" />
-              )}
+              <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+                Déconnexion
+              </span>
             </div>
-          </div>
-        </div>
-
-        <div
-          aria-hidden={!open}
-          inert={!open}
-          className={cn(
-            "absolute inset-0 flex w-72 flex-col transition-opacity duration-150 md:w-[17rem]",
-            open ? "opacity-100 delay-150" : "pointer-events-none opacity-0",
           )}
-        >
-          <div className="flex h-[4.5rem] items-center justify-between gap-3 border-b border-sidebar-border px-4">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <img src="/favicon.svg" alt="" className="size-9 shrink-0 rounded-xl shadow-sm" />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-bold tracking-tight">Nova Data</p>
-                <p className="truncate text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
-                  Manufacturing Intelligence
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onToggle}
-              aria-label="Réduire le menu"
-              className="rounded-lg p-2 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-            >
-              <PanelLeftClose className="size-4" />
-            </button>
-          </div>
-
-          <div className="border-b border-sidebar-border p-3">
-            <label
-              htmlFor="sidebar-ligne"
-              className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
-            >
-              <Factory className="size-3" /> Ligne active
-            </label>
-            <select
-              id="sidebar-ligne"
-              value={ligneId ?? ""}
-              onChange={(event) =>
-                onChangeLigne(event.target.value ? Number(event.target.value) : null)
-              }
-              className="h-10 w-full rounded-xl border border-sidebar-border bg-background px-3 text-sm font-medium outline-none transition-shadow focus:border-ring focus:ring-2 focus:ring-ring/15"
-            >
-              <option value="">Vue usine · toutes les lignes</option>
-              {lignes.map((ligne) => (
-                <option key={ligne.id} value={ligne.id}>
-                  {ligne.designation}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
-            {groupesPrincipauxVisibles.map((group) => (
-              <div key={group.titre}>
-                <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/40">
-                  {group.titre}
-                </p>
-                <div className="space-y-0.5">
-                  {group.items.map((item) => (
-                    <NavigationButton
-                      key={item.view}
-                      item={item}
-                      active={view === item.view}
-                      onClick={() => onChange(item.view)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-
-            {ressourcesVisibles.length > 0 && (
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setResourcesOpen((value) => !value)}
-                  aria-expanded={resourcesOpen}
-                  className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/40 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/70"
-                >
-                  Ressources
-                  <ChevronDown
-                    className={cn("size-3.5 transition-transform", resourcesOpen && "rotate-180")}
-                  />
-                </button>
-                {resourcesOpen && (
-                  <div className="mt-1 space-y-0.5">
-                    {ressourcesVisibles.map((item) => (
-                      <NavigationButton
-                        key={item.view}
-                        item={item}
-                        active={view === item.view}
-                        onClick={() => onChange(item.view)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </nav>
-
-          <div className="space-y-2 border-t border-sidebar-border px-4 py-3">
-            <div
-              className={cn(
-                "flex items-center gap-2 text-xs font-medium",
-                connected ? "text-emerald-600 dark:text-emerald-400" : "text-destructive",
-              )}
-            >
-              {connected ? <Wifi className="size-3.5" /> : <WifiOff className="size-3.5" />}
-              {connected ? "Temps réel actif" : "Connexion interrompue"}
-            </div>
-
-            {user && (
-              <div className="rounded-xl border border-sidebar-border bg-sidebar-accent/40 p-2.5">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">
-                    {user.nom_complet || "Utilisateur"}
-                  </p>
-                  <p className="truncate text-[11px] text-muted-foreground">{user.telephone}</p>
-                </div>
-                <div className="mt-2 flex items-center gap-1.5">
-                  {user.is_admin && (
-                    <button
-                      type="button"
-                      onClick={() => navigate("/admin")}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-violet-600 px-2 py-1.5 text-xs font-medium text-white transition-colors hover:bg-violet-700"
-                    >
-                      <UserCog className="size-3.5" /> Admin
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={logout}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-sidebar-border px-2 py-1.5 text-xs font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent"
-                  >
-                    <LogOut className="size-3.5" /> Déconnexion
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </aside>
+
+      {/* =========================================================================
+          Panneau Drawer Flottant : S'ouvre sur le conteneur à droite du rail
+         ========================================================================= */}
+      {activeDrawer && (
+        <>
+          {/* Fond obscurci cliquable pour fermer */}
+          <div
+            className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px] transition-opacity"
+            onClick={() => setActiveDrawer(null)}
+            aria-hidden="true"
+          />
+
+          {/* Tiroir d'éléments */}
+          <div
+            role="dialog"
+            aria-modal="true"
+            className={cn(
+              "fixed z-50 top-3 bottom-3 left-[5.25rem] w-80 md:w-88 rounded-2xl",
+              "border border-border/80 bg-card/95 backdrop-blur-2xl shadow-2xl flex flex-col overflow-hidden",
+              "animate-in fade-in slide-in-from-left-4 duration-200",
+            )}
+          >
+            {/* Cas 1 : Sélecteur de Ligne Active */}
+            {activeDrawer === "lignes" ? (
+              <>
+                <div className="flex items-center justify-between border-b border-border/80 p-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex size-9 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                      <Factory className="size-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-bold tracking-tight text-foreground">
+                        Lignes de Production
+                      </h2>
+                      <p className="text-[11px] text-muted-foreground">
+                        Filtrer la supervision d'atelier
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveDrawer(null)}
+                    className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChangeLigne(null)
+                      setActiveDrawer(null)
+                    }}
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-xl p-3 text-left transition-all",
+                      ligneId === null
+                        ? "bg-violet-600 text-white font-semibold shadow-md shadow-violet-600/20"
+                        : "hover:bg-accent text-foreground",
+                    )}
+                  >
+                    <div>
+                      <p className="text-sm">Toutes les lignes</p>
+                      <p
+                        className={cn(
+                          "text-xs",
+                          ligneId === null ? "text-violet-100" : "text-muted-foreground",
+                        )}
+                      >
+                        Vue d'ensemble globale de l'usine
+                      </p>
+                    </div>
+                    {ligneId === null && <Check className="size-4" />}
+                  </button>
+
+                  {lignes.map((l) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onClick={() => {
+                        onChangeLigne(l.id)
+                        setActiveDrawer(null)
+                      }}
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-xl p-3 text-left transition-all",
+                        ligneId === l.id
+                          ? "bg-violet-600 text-white font-semibold shadow-md shadow-violet-600/20"
+                          : "hover:bg-accent text-foreground",
+                      )}
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{l.designation}</p>
+                        <p
+                          className={cn(
+                            "text-xs",
+                            ligneId === l.id ? "text-violet-100" : "text-muted-foreground",
+                          )}
+                        >
+                          Ligne #{l.id}
+                        </p>
+                      </div>
+                      {ligneId === l.id && <Check className="size-4" />}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              /* Cas 2 : Catégorie de navigation (Pilotage, Analyse, Ressources) */
+              activeCategoryData && (
+                <>
+                  <div className="flex items-center justify-between border-b border-border/80 p-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex size-9 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                        <activeCategoryData.icon className="size-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <h2 className="text-sm font-bold tracking-tight text-foreground">
+                            {activeCategoryData.titre}
+                          </h2>
+                          <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
+                            {activeCategoryData.badge}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          {activeCategoryData.items.length} modules disponibles
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveDrawer(null)}
+                      className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+                    {activeCategoryData.items.map((item) => {
+                      const isActive = view === item.view
+
+                      return (
+                        <button
+                          key={item.view}
+                          type="button"
+                          onClick={() => handleSelectView(item.view)}
+                          className={cn(
+                            "group flex w-full items-start gap-3 rounded-xl p-3 text-left transition-all",
+                            isActive
+                              ? "bg-violet-600 text-white font-semibold shadow-md shadow-violet-600/20"
+                              : "hover:bg-accent text-foreground",
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors mt-0.5",
+                              isActive
+                                ? "bg-white/20 text-white"
+                                : "bg-muted text-muted-foreground group-hover:bg-violet-100 group-hover:text-violet-600 dark:group-hover:bg-violet-950 dark:group-hover:text-violet-300",
+                            )}
+                          >
+                            <item.icon className="size-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">{item.label}</span>
+                              {isActive && <Check className="size-4 shrink-0" />}
+                            </div>
+                            <p
+                              className={cn(
+                                "text-xs line-clamp-2 mt-0.5 leading-relaxed",
+                                isActive ? "text-violet-100" : "text-muted-foreground",
+                              )}
+                            >
+                              {item.description}
+                            </p>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )
+            )}
+          </div>
+        </>
+      )}
     </>
   )
 }

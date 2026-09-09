@@ -338,7 +338,7 @@ export function OrdresPage({ onAskNova }: { onAskNova?: (message: string) => voi
 
   return (
     <Page
-      title="Ordres de fabrication"
+      title="Ordres de Fabrication"
       description="Lancement et suivi des OF. La création consomme les MP en FEFO. Demandez l'ordonnancement à Nova : « ordonnance les OF en EDD », « quelle règle est la meilleure ? », « passe l'OF-2026-00007 en premier »."
       actions={
         <Button onClick={openCreate}>
