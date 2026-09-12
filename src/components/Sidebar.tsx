@@ -4,23 +4,21 @@ import {
   Activity,
   AlertTriangle,
   BookOpen,
-  Boxes,
   Check,
   ClipboardList,
   Factory,
   FlaskConical,
   LayoutDashboard,
   LogOut,
-  MessageSquare,
   Package,
   ShieldCheck,
-  SlidersHorizontal,
   Truck,
   UserCog,
   Wifi,
   WifiOff,
   Wrench,
   X,
+  Layers,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { lignesApi } from "@/lib/api"
@@ -31,9 +29,8 @@ import { canAccessView } from "@/lib/permissions"
 
 export type NavView =
   | "dashboard"
-  | "machines"
-  | "jumeau"
   | "trs"
+  | "afnor"
   | "arrets"
   | "qualite"
   | "maintenance"
@@ -44,8 +41,6 @@ export type NavView =
   | "lignes"
   | "fournisseurs"
   | "documents"
-  | "simulateur"
-  | "assistant"
 
 interface NavItem {
   view: NavView
@@ -78,28 +73,10 @@ const CATEGORIES: CategoryConfig[] = [
         icon: LayoutDashboard,
       },
       {
-        view: "machines",
-        label: "Machines & Postes",
-        description: "Cadences, capteurs IoT et état des postes",
-        icon: Factory,
-      },
-      {
         view: "ordres",
         label: "Ordres de fabrication",
         description: "Planification et état d'avancement des OFs",
         icon: ClipboardList,
-      },
-      {
-        view: "jumeau",
-        label: "Jumeau numérique 3D",
-        description: "Visualisation 3D interactive de la ligne",
-        icon: Boxes,
-      },
-      {
-        view: "assistant",
-        label: "Assistant Nova",
-        description: "Copilote vocal et agent IA autonome",
-        icon: MessageSquare,
       },
     ],
   },
@@ -114,6 +91,12 @@ const CATEGORIES: CategoryConfig[] = [
         label: "TRS & Rendement",
         description: "Taux de Rendement Synthétique, B/P/Q",
         icon: Activity,
+      },
+      {
+        view: "afnor",
+        label: "Norme AFNOR",
+        description: "Décomposition emboîtée NF E 60-182 par OF",
+        icon: Layers,
       },
       {
         view: "arrets",
@@ -176,12 +159,6 @@ const CATEGORIES: CategoryConfig[] = [
         label: "Documentation BPF",
         description: "Procédures opératoires et fiches techniques",
         icon: BookOpen,
-      },
-      {
-        view: "simulateur",
-        label: "Simulateur d'usine",
-        description: "Génération de flux et scénarios de charge",
-        icon: SlidersHorizontal,
       },
     ],
   },
@@ -249,7 +226,7 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
       {/* Fond mobile si ouvert */}
       {open && (
         <div
-          className="fixed inset-0 z-30 bg-black/40 backdrop-blur-xs md:hidden"
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
           onClick={onToggle}
           aria-hidden="true"
         />
@@ -262,9 +239,9 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
         aria-label="Navigation principale"
         className={cn(
           "relative z-30 my-3 ml-3 flex h-[calc(100dvh-1.5rem)] w-16 shrink-0 flex-col items-center justify-between",
-          "rounded-2xl border border-border/80 bg-card/95 p-2.5 shadow-xl backdrop-blur-xl transition-all",
+          "rounded-xl border border-border bg-card p-2.5 transition-all",
           // Sur mobile uniquement : position fixed en overlay quand ouvert
-          "max-md:fixed max-md:left-0 max-md:top-0 max-md:z-40 max-md:shadow-2xl",
+          "max-md:fixed max-md:left-0 max-md:top-0 max-md:z-40 max-md:shadow-lg",
           !open && "max-md:hidden",
         )}
       >
@@ -275,12 +252,12 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
             type="button"
             onClick={() => handleSelectView("dashboard")}
             title="Nova MES"
-            className="group relative flex size-10 items-center justify-center transition-transform hover:scale-110 active:scale-95"
+            className="group relative flex size-12 items-center justify-center rounded-xl transition-transform hover:bg-accent/60 active:scale-95"
           >
             <img
               src="/nova-logo.png"
               alt="Nova"
-              className="size-8 object-contain"
+              className="size-9 object-contain transition-transform group-hover:scale-105"
             />
           </button>
 
@@ -299,9 +276,9 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
                     className={cn(
                       "flex size-11 items-center justify-center rounded-xl transition-all",
                       isDrawerOpen
-                        ? "bg-violet-600 text-white shadow-md shadow-violet-600/30 scale-105"
+                        ? "bg-foreground text-background"
                         : isSelectedCategory
-                          ? "bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 ring-1 ring-violet-500/30"
+                          ? "bg-accent text-foreground"
                           : "text-muted-foreground hover:bg-accent hover:text-foreground",
                     )}
                   >
@@ -309,7 +286,7 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
                   </button>
 
                   {/* Tooltip au survol */}
-                  <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+                  <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background opacity-0 transition-opacity group-hover:opacity-100">
                     {cat.titre}
                   </span>
                 </div>
@@ -329,9 +306,9 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
               className={cn(
                 "flex size-11 items-center justify-center rounded-xl transition-all",
                 activeDrawer === "lignes"
-                  ? "bg-violet-600 text-white shadow-md shadow-violet-600/30"
+                  ? "bg-foreground text-background"
                   : ligneId
-                    ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 ring-1 ring-emerald-500/30"
+                    ? "bg-accent text-foreground"
                     : "text-muted-foreground hover:bg-accent hover:text-foreground",
               )}
             >
@@ -340,7 +317,7 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
                 <span className="absolute right-2 top-2 size-2 rounded-full bg-emerald-500" />
               )}
             </button>
-            <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+            <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background opacity-0 transition-opacity group-hover:opacity-100">
               Lignes ({getActiveLineLabel()})
             </span>
           </div>
@@ -352,11 +329,11 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
                 type="button"
                 onClick={() => navigate("/admin")}
                 title="Administration"
-                className="flex size-11 items-center justify-center rounded-xl text-violet-600 transition-all hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/50"
+                className="flex size-11 items-center justify-center rounded-xl text-muted-foreground transition-all hover:bg-accent hover:text-foreground"
               >
                 <UserCog className="size-5" />
               </button>
-              <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+              <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background opacity-0 transition-opacity group-hover:opacity-100">
                 Administration
               </span>
             </div>
@@ -387,7 +364,7 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
               >
                 <LogOut className="size-5" />
               </button>
-              <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-lg bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+              <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background opacity-0 transition-opacity group-hover:opacity-100">
                 Déconnexion
               </span>
             </div>
@@ -402,7 +379,7 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
         <>
           {/* Fond obscurci cliquable pour fermer */}
           <div
-            className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px] transition-opacity"
+            className="fixed inset-0 z-40 bg-black/20 transition-opacity"
             onClick={() => setActiveDrawer(null)}
             aria-hidden="true"
           />
@@ -412,8 +389,8 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
             role="dialog"
             aria-modal="true"
             className={cn(
-              "fixed z-50 top-3 bottom-3 left-[5.25rem] w-80 md:w-88 rounded-2xl",
-              "border border-border/80 bg-card/95 backdrop-blur-2xl shadow-2xl flex flex-col overflow-hidden",
+              "fixed z-50 top-3 bottom-3 left-[5.25rem] w-80 md:w-88 rounded-xl",
+              "border border-border bg-card shadow-lg flex flex-col overflow-hidden",
               "animate-in fade-in slide-in-from-left-4 duration-200",
             )}
           >
@@ -422,14 +399,14 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
               <>
                 <div className="flex items-center justify-between border-b border-border/80 p-4">
                   <div className="flex items-center gap-2.5">
-                    <div className="flex size-9 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                    <div className="flex size-9 items-center justify-center rounded-lg bg-muted text-foreground">
                       <Factory className="size-5" />
                     </div>
                     <div>
-                      <h2 className="text-sm font-bold tracking-tight text-foreground">
+                      <h2 className="text-sm font-semibold tracking-tight text-foreground">
                         Lignes de Production
                       </h2>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         Filtrer la supervision d'atelier
                       </p>
                     </div>
@@ -453,7 +430,7 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
                     className={cn(
                       "flex w-full items-center justify-between rounded-xl p-3 text-left transition-all",
                       ligneId === null
-                        ? "bg-violet-600 text-white font-semibold shadow-md shadow-violet-600/20"
+                        ? "bg-accent text-foreground font-medium"
                         : "hover:bg-accent text-foreground",
                     )}
                   >
@@ -462,7 +439,7 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
                       <p
                         className={cn(
                           "text-xs",
-                          ligneId === null ? "text-violet-100" : "text-muted-foreground",
+                          ligneId === null ? "text-muted-foreground" : "text-muted-foreground",
                         )}
                       >
                         Vue d'ensemble globale de l'usine
@@ -482,7 +459,7 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
                       className={cn(
                         "flex w-full items-center justify-between rounded-xl p-3 text-left transition-all",
                         ligneId === l.id
-                          ? "bg-violet-600 text-white font-semibold shadow-md shadow-violet-600/20"
+                          ? "bg-accent text-foreground font-medium"
                           : "hover:bg-accent text-foreground",
                       )}
                     >
@@ -491,7 +468,7 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
                         <p
                           className={cn(
                             "text-xs",
-                            ligneId === l.id ? "text-violet-100" : "text-muted-foreground",
+                            ligneId === l.id ? "text-muted-foreground" : "text-muted-foreground",
                           )}
                         >
                           Ligne #{l.id}
@@ -508,19 +485,19 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
                 <>
                   <div className="flex items-center justify-between border-b border-border/80 p-4">
                     <div className="flex items-center gap-2.5">
-                      <div className="flex size-9 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                      <div className="flex size-9 items-center justify-center rounded-lg bg-muted text-foreground">
                         <activeCategoryData.icon className="size-5" />
                       </div>
                       <div>
                         <div className="flex items-center gap-1.5">
-                          <h2 className="text-sm font-bold tracking-tight text-foreground">
+                          <h2 className="text-sm font-semibold tracking-tight text-foreground">
                             {activeCategoryData.titre}
                           </h2>
-                          <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
+                          <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                             {activeCategoryData.badge}
                           </span>
                         </div>
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           {activeCategoryData.items.length} modules disponibles
                         </p>
                       </div>
@@ -546,7 +523,7 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
                           className={cn(
                             "group flex w-full items-start gap-3 rounded-xl p-3 text-left transition-all",
                             isActive
-                              ? "bg-violet-600 text-white font-semibold shadow-md shadow-violet-600/20"
+                              ? "bg-accent text-foreground font-medium"
                               : "hover:bg-accent text-foreground",
                           )}
                         >
@@ -554,8 +531,8 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
                             className={cn(
                               "flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors mt-0.5",
                               isActive
-                                ? "bg-white/20 text-white"
-                                : "bg-muted text-muted-foreground group-hover:bg-violet-100 group-hover:text-violet-600 dark:group-hover:bg-violet-950 dark:group-hover:text-violet-300",
+                                ? "bg-background text-foreground"
+                                : "bg-muted text-muted-foreground group-hover:text-foreground",
                             )}
                           >
                             <item.icon className="size-4" />
@@ -568,7 +545,7 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
                             <p
                               className={cn(
                                 "text-xs line-clamp-2 mt-0.5 leading-relaxed",
-                                isActive ? "text-violet-100" : "text-muted-foreground",
+                                isActive ? "text-muted-foreground" : "text-muted-foreground",
                               )}
                             >
                               {item.description}

@@ -147,30 +147,34 @@ export function Modal({
   title,
   children,
   footer,
+  maxWidth = "max-w-lg",
+  className,
 }: {
   open: boolean
   onClose: () => void
   title: string
   children: ReactNode
   footer?: ReactNode
+  maxWidth?: string
+  className?: string
 }) {
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg rounded-2xl border border-border bg-card shadow-xl">
-        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-          <h2 className="text-sm font-semibold">{title}</h2>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-xs transition-opacity" onClick={onClose} />
+      <div className={cn("relative z-10 w-full rounded-2xl border border-border/80 bg-card shadow-2xl transition-all overflow-hidden", maxWidth, className)}>
+        <div className="flex items-center justify-between border-b border-border/80 px-6 py-4">
+          <h2 className="text-base font-bold tracking-tight text-foreground">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
           >
             <X className="size-4" />
           </button>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
+        <div className="max-h-[85vh] overflow-y-auto px-6 py-5">{children}</div>
         {footer && (
-          <div className="flex justify-end gap-2 border-t border-border px-5 py-3.5">{footer}</div>
+          <div className="flex items-center justify-end gap-2.5 border-t border-border/80 bg-muted/20 px-6 py-3.5">{footer}</div>
         )}
       </div>
     </div>
@@ -231,7 +235,7 @@ export function SectionLabel({ children }: { children: ReactNode }) {
   return (
     <div className="mb-2 flex items-center gap-2">
       <span className="size-1.5 rounded-full bg-primary" />
-      <h2 className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <h2 className="text-xs font-semibold text-muted-foreground">
         {children}
       </h2>
     </div>

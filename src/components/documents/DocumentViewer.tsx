@@ -213,7 +213,7 @@ export function DocumentViewer({ documentId, page, passages, nom, onClose }: Doc
         {/* Rail des citations */}
         {surlignables.length > 0 && (
           <aside className="hidden w-72 shrink-0 overflow-y-auto border-l border-border p-3 lg:block">
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="mb-2 text-xs font-semibold text-muted-foreground">
               Passages cités
             </p>
             <div className="space-y-2">

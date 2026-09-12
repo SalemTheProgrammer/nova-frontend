@@ -110,11 +110,11 @@ function ArticlesCatalogueCard({
             <PackageSearch className="size-4" />
             <span className="text-sm font-semibold">Articles fabricables</span>
           </div>
-          <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold">
+          <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold">
             {articles.length} articles
           </span>
         </div>
-        <label className="mt-3 flex items-center gap-2 rounded-lg bg-white/95 px-3 py-2 text-slate-700 shadow-inner">
+        <label className="mt-3 flex items-center gap-2 rounded-lg bg-white/95 px-3 py-2 text-slate-700">
           <Search className="size-3.5 text-slate-400" />
           <input
             value={query}
@@ -128,18 +128,18 @@ function ArticlesCatalogueCard({
       <div className="max-h-80 divide-y divide-border/60 overflow-y-auto">
         {filtered.map((article) => (
           <div key={article.code} className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-neutral-100/80 dark:hover:bg-neutral-900/70">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-neutral-900 font-mono text-[10px] font-bold text-white dark:bg-white dark:text-black">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-neutral-900 font-mono text-xs font-semibold text-white dark:bg-white dark:text-black">
               {article.code.slice(0, 3)}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="font-mono text-[11px] font-bold text-neutral-950 dark:text-white">{article.code}</p>
+              <p className="font-mono text-xs font-semibold text-neutral-950 dark:text-white">{article.code}</p>
               <p className="truncate text-xs text-foreground/80" title={article.designation}>{article.designation}</p>
             </div>
             {onQuickReply && (
               <button
                 type="button"
                 onClick={() => onQuickReply(`Je veux fabriquer ${article.code}`)}
-                className="rounded-lg bg-neutral-950 px-2.5 py-1.5 text-[10px] font-semibold text-white opacity-80 transition hover:bg-black group-hover:opacity-100 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+                className="rounded-lg bg-neutral-950 px-2.5 py-1.5 text-xs font-semibold text-white opacity-80 transition hover:bg-black group-hover:opacity-100 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
               >
                 Choisir
               </button>
@@ -259,8 +259,8 @@ function OFCreeCard({ artifact }: { artifact: AgentArtifact }) {
           </p>
         )}
         <p className="rounded bg-amber-500/10 px-2 py-1 text-amber-600 dark:text-amber-400">
-          ⚠ {ligneAffectee ? "Ligne affectée, mais l'OF" : "Aucune ligne affectée — l'OF"} doit
-          encore être lancé sur une machine pour apparaître dans le jumeau numérique.
+          {ligneAffectee ? "Ligne affectée, mais l'OF" : "Aucune ligne affectée — l'OF"} doit
+          encore être lancé sur une machine pour démarrer la production.
         </p>
         {consommations.length > 0 && (
           <div>
@@ -296,7 +296,7 @@ function OrdresListeCard({ artifact }: { artifact: AgentArtifact }) {
           <ClipboardList className="size-4" />
           <span className="text-sm font-semibold">Ordres de fabrication</span>
         </div>
-        <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold">
+        <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold">
           {ordres.length} OF
         </span>
       </div>
@@ -325,7 +325,7 @@ function OrdresListeCard({ artifact }: { artifact: AgentArtifact }) {
                 <td className="px-4 py-2 text-right">
                   <span
                     className={cn(
-                      "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                      "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold",
                       STATUT_TONES[of.statut] ?? "bg-muted text-muted-foreground",
                     )}
                   >
@@ -423,8 +423,8 @@ function LignesScoreCard({ artifact }: { artifact: AgentArtifact }) {
           <li key={l.ligne_id} className="text-xs">
             <div className="mb-0.5 flex items-center justify-between">
               <span className={cn("font-medium", i === 0 && "text-emerald-600 dark:text-emerald-400")}>
-                {i === 0 && "★ "}
                 {l.code} — {l.designation}
+                {i === 0 && " (recommandée)"}
               </span>
               <span className="font-semibold tabular-nums">{Math.round(l.score * 100)}/100</span>
             </div>
@@ -464,7 +464,7 @@ function SwitchImpactCard({ artifact }: { artifact: AgentArtifact }) {
           </div>
           <span
             className={cn(
-              "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold",
+              "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold",
               a.faisable
                 ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
                 : "bg-destructive/15 text-destructive",
@@ -481,7 +481,7 @@ function SwitchImpactCard({ artifact }: { artifact: AgentArtifact }) {
               {a.article.code}{" "}
               <span
                 className={cn(
-                  "ml-1 text-[10px] font-normal",
+                  "ml-1 text-xs font-normal",
                   a.compatible ? "text-emerald-600 dark:text-emerald-400" : "text-destructive",
                 )}
               >

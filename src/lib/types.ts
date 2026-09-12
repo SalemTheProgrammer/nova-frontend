@@ -259,6 +259,7 @@ export type CauseArret =
   | "MAINTENANCE_PLANIFIEE"
   | "MICRO_ARRET"
   | "QUALITE_BLOQUANTE"
+  | "PRELEVEMENT_QUALITE"
   | "AUTRE"
 
 export const CAUSES_ARRET: CauseArret[] = [
@@ -272,6 +273,7 @@ export const CAUSES_ARRET: CauseArret[] = [
   "MAINTENANCE_PLANIFIEE",
   "MICRO_ARRET",
   "QUALITE_BLOQUANTE",
+  "PRELEVEMENT_QUALITE",
   "AUTRE",
 ]
 
@@ -322,6 +324,10 @@ export interface Machine {
   quantite_rejetee: number
   dernier_evenement_at: string | null
   downtime_actif: DowntimeActif | null
+  /** Automate Sparkplug rattaché en ligne ? `null` = aucun automate rattaché. */
+  automate_connecte: boolean | null
+  /** Employé au poste (badge RFID lu par l'automate). `null` = personne. */
+  operateur?: { matricule: string; nom: string | null } | null
   trs: string | null
   tq: string | null
   tp: string | null
@@ -623,22 +629,19 @@ export interface DashboardResume {
 
 // --------------------------- Sparkplug B & IoT --------------------------- //
 
+// Miroir exact des enums backend `TargetKpi` / `TagTransformation` (models/sparkplug.py).
 export type TargetKpi =
   | "BONNES_PIECES"
   | "REJETS"
   | "CADENCE"
   | "STATUT_MACHINE"
-  | "TEMPERATURE"
-  | "VIBRATION"
-  | "OPERATOR_CARD"
   | "CAUSE_ARRET"
-
-export type TagTransformation =
-  | "DIRECT"
-  | "SCALE_FACTOR"
-  | "THRESHOLD_STATE"
-  | "DELTA"
+  | "CAUSE_REBUT"
+  | "TEMPERATURE"
+  | "PUISSANCE"
   | "OPERATOR_CARD"
+
+export type TagTransformation = "DIRECT" | "SCALE_FACTOR" | "THRESHOLD_STATE" | "OPERATOR_CARD"
 
 export interface SparkplugTagMapping {
   id: number
@@ -658,11 +661,28 @@ export interface SparkplugDevice {
   edge_node_id: string
   device_id: string
   machine_id: number | null
+  machine_code: string | null
+  broker_url: string | null
   online: boolean
   last_birth_at: string | null
   last_data_at: string | null
-  available_metrics?: Record<string, { dataType: string; valeur_initiale: unknown }> | null
+  /** Catalogue déclaré à la dernière naissance (DBIRTH). */
+  available_metrics: Record<string, { datatype: string; valeur: unknown }> | null
+  /** Dernière valeur reçue par métrique. */
+  last_values: Record<string, unknown> | null
   mappings: SparkplugTagMapping[]
+}
+
+export interface SparkplugStatus {
+  enabled: boolean
+  connected: boolean
+  broker: string | null
+  group_id: string
+  host_id: string
+  last_error: string | null
+  queue_depth: number
+  edge_nodes: number
+  commandes_en_attente: number
 }
 
 // ----------------------- Prélèvements Matière Première (BPF) ----------------------- //

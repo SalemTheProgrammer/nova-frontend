@@ -111,8 +111,8 @@ export const PrelevementModal: React.FC<PrelevementModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-white rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 animate-in fade-in duration-200">
+      <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-white rounded-xl shadow-2xl border border-slate-200/80 overflow-hidden">
         {/* Header */}
         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div className="flex items-center gap-3">
@@ -121,10 +121,10 @@ export const PrelevementModal: React.FC<PrelevementModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-slate-900">
+                <h2 className="text-lg font-semibold text-slate-900">
                   Prélèvements Matières Premières & Libération CQ
                 </h2>
-                <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-md bg-blue-100 text-blue-800 border border-blue-200/60">
+                <span className="px-2 py-0.5 text-xs font-semibold rounded-md bg-blue-100 text-blue-800 border border-blue-200/60">
                   BPF / DPM Tunisie
                 </span>
               </div>
@@ -148,7 +148,7 @@ export const PrelevementModal: React.FC<PrelevementModalProps> = ({
             onClick={() => setActiveTab("quarantaine")}
             className={`py-3 border-b-2 flex items-center gap-2 transition ${
               activeTab === "quarantaine"
-                ? "border-blue-600 text-blue-600 font-bold"
+                ? "border-blue-600 text-blue-600 font-semibold"
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
@@ -159,7 +159,7 @@ export const PrelevementModal: React.FC<PrelevementModalProps> = ({
             onClick={() => setActiveTab("prelevements")}
             className={`py-3 border-b-2 flex items-center gap-2 transition ${
               activeTab === "prelevements"
-                ? "border-blue-600 text-blue-600 font-bold"
+                ? "border-blue-600 text-blue-600 font-semibold"
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
@@ -187,7 +187,7 @@ export const PrelevementModal: React.FC<PrelevementModalProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-sm font-bold text-slate-900">
+                  <h4 className="text-sm font-semibold text-slate-900">
                     Lots MP sous Quarantaine (En attente de libération BPF)
                   </h4>
                   <p className="text-xs text-slate-500">
@@ -202,7 +202,7 @@ export const PrelevementModal: React.FC<PrelevementModalProps> = ({
                 </button>
               </div>
 
-              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                     <tr>
@@ -217,12 +217,12 @@ export const PrelevementModal: React.FC<PrelevementModalProps> = ({
                     {lotsQuarantaine.length > 0 ? (
                       lotsQuarantaine.map((lot) => (
                         <tr key={lot.id} className="hover:bg-slate-50/70 transition">
-                          <td className="py-3 px-4 font-mono font-bold text-slate-900">
+                          <td className="py-3 px-4 font-mono font-semibold text-slate-900">
                             {lot.numero_lot}
                           </td>
                           <td className="py-3 px-4">
                             <span className="font-semibold text-slate-800">{lot.nom_matiere}</span>
-                            <span className="block text-[11px] text-slate-400 font-mono">
+                            <span className="block text-xs text-slate-400 font-mono">
                               {lot.code_matiere}
                             </span>
                           </td>
@@ -230,14 +230,14 @@ export const PrelevementModal: React.FC<PrelevementModalProps> = ({
                             {lot.quantite_actuelle} {lot.unite}
                           </td>
                           <td className="py-3 px-4">
-                            <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold text-[10px]">
+                            <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold text-xs">
                               BLOQUÉ (QUARANTAINE)
                             </span>
                           </td>
                           <td className="py-3 px-4 text-right">
                             <button
                               onClick={() => setSelectedLot(lot)}
-                              className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm transition inline-flex items-center gap-1.5"
+                              className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm transition inline-flex items-center gap-1.5"
                             >
                               <Beaker className="w-3.5 h-3.5" />
                               Prélever
@@ -260,7 +260,7 @@ export const PrelevementModal: React.FC<PrelevementModalProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-sm font-bold text-slate-900">
+                  <h4 className="text-sm font-semibold text-slate-900">
                     Fiches de Prélèvements & Bulletins d&apos;Analyses
                   </h4>
                   <p className="text-xs text-slate-500">
@@ -275,7 +275,7 @@ export const PrelevementModal: React.FC<PrelevementModalProps> = ({
                 </button>
               </div>
 
-              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                     <tr>
@@ -291,47 +291,47 @@ export const PrelevementModal: React.FC<PrelevementModalProps> = ({
                     {prelevements.length > 0 ? (
                       prelevements.map((p) => (
                         <tr key={p.id} className="hover:bg-slate-50/70 transition">
-                          <td className="py-3 px-4 font-mono font-bold text-blue-600">
+                          <td className="py-3 px-4 font-mono font-semibold text-blue-600">
                             {p.numero}
                           </td>
                           <td className="py-3 px-4">
                             <span className="font-semibold text-slate-900">{p.numero_lot}</span>
-                            <span className="block text-[11px] text-slate-500">{p.nom_matiere}</span>
+                            <span className="block text-xs text-slate-500">{p.nom_matiere}</span>
                           </td>
                           <td className="py-3 px-4 font-mono">
                             {p.quantite_prelevee} {p.unite}
                           </td>
                           <td className="py-3 px-4">
                             {p.statut === "CONFORME" ? (
-                              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-[10px] flex items-center gap-1 w-fit">
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-xs flex items-center gap-1 w-fit">
                                 <CheckCircle2 className="w-3 h-3" />
                                 CONFORME (LIBÉRÉ)
                               </span>
                             ) : p.statut === "NON_CONFORME" ? (
-                              <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-semibold text-[10px] flex items-center gap-1 w-fit">
+                              <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-semibold text-xs flex items-center gap-1 w-fit">
                                 <XCircle className="w-3 h-3" />
                                 REJETÉ
                               </span>
                             ) : (
-                              <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold text-[10px] flex items-center gap-1 w-fit">
+                              <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold text-xs flex items-center gap-1 w-fit">
                                 <Clock className="w-3 h-3" />
                                 EN ATTENTE LABO
                               </span>
                             )}
                           </td>
-                          <td className="py-3 px-4 font-mono text-slate-600 text-[11px]">
+                          <td className="py-3 px-4 font-mono text-slate-600 text-xs">
                             {p.bulletin_analyse_ref || "—"}
                           </td>
                           <td className="py-3 px-4 text-right">
                             {p.statut === "EN_ATTENTE_CQ" ? (
                               <button
                                 onClick={() => setSelectedPrelevement(p)}
-                                className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition inline-flex items-center gap-1"
+                                className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs shadow-sm transition inline-flex items-center gap-1"
                               >
                                 Valider CQ
                               </button>
                             ) : (
-                              <span className="text-[11px] text-slate-400 font-medium">Clôturé</span>
+                              <span className="text-xs text-slate-400 font-medium">Clôturé</span>
                             )}
                           </td>
                         </tr>
@@ -352,9 +352,9 @@ export const PrelevementModal: React.FC<PrelevementModalProps> = ({
           {/* Modal dialogue de prélèvement */}
           {selectedLot && (
             <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/40">
-              <div className="bg-white rounded-2xl shadow-xl border p-6 w-full max-w-md space-y-4">
+              <div className="bg-white rounded-xl shadow-xl border p-6 w-full max-w-md space-y-4">
                 <div className="flex items-center justify-between border-b pb-3">
-                  <h3 className="text-sm font-bold text-slate-900">
+                  <h3 className="text-sm font-semibold text-slate-900">
                     Prélèvement d&apos;Échantillon — {selectedLot.numero_lot}
                   </h3>
                   <button onClick={() => setSelectedLot(null)} className="text-slate-400 hover:text-slate-700">
@@ -407,8 +407,8 @@ export const PrelevementModal: React.FC<PrelevementModalProps> = ({
                       className="w-full p-2 border rounded-xl"
                     />
                   </div>
-                  <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-[11px]">
-                    📍 Emplacement standard : <strong>SAS Prélèvement MP - Flux Laminaire ISO 5</strong>
+                  <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs">
+                    Emplacement standard : <strong>SAS Prélèvement MP - Flux Laminaire ISO 5</strong>
                   </div>
                   <div className="flex items-center justify-end gap-2 pt-2">
                     <button
@@ -420,7 +420,7 @@ export const PrelevementModal: React.FC<PrelevementModalProps> = ({
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-sm"
+                      className="px-4 py-2 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 shadow-sm"
                     >
                       Confirmer le Prélèvement
                     </button>
@@ -433,9 +433,9 @@ export const PrelevementModal: React.FC<PrelevementModalProps> = ({
           {/* Modal dialogue de validation CQ */}
           {selectedPrelevement && (
             <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/40">
-              <div className="bg-white rounded-2xl shadow-xl border p-6 w-full max-w-md space-y-4">
+              <div className="bg-white rounded-xl shadow-xl border p-6 w-full max-w-md space-y-4">
                 <div className="flex items-center justify-between border-b pb-3">
-                  <h3 className="text-sm font-bold text-slate-900">
+                  <h3 className="text-sm font-semibold text-slate-900">
                     Validation Laboratoire CQ — {selectedPrelevement.numero}
                   </h3>
                   <button onClick={() => setSelectedPrelevement(null)} className="text-slate-400 hover:text-slate-700">
@@ -484,7 +484,7 @@ export const PrelevementModal: React.FC<PrelevementModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleValiderAnalyse(false)}
-                      className="flex-1 py-2 px-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 font-bold hover:bg-rose-100 flex items-center justify-center gap-1.5"
+                      className="flex-1 py-2 px-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 font-semibold hover:bg-rose-100 flex items-center justify-center gap-1.5"
                     >
                       <XCircle className="w-4 h-4" />
                       Rejeter Lot
@@ -492,7 +492,7 @@ export const PrelevementModal: React.FC<PrelevementModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleValiderAnalyse(true)}
-                      className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 shadow-sm flex items-center justify-center gap-1.5"
+                      className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 shadow-sm flex items-center justify-center gap-1.5"
                     >
                       <CheckCircle className="w-4 h-4" />
                       Libérer le Lot (DISPONIBLE)

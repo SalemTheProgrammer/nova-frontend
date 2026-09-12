@@ -25,7 +25,7 @@ export function KpiCard({
   return (
     <Card className="p-3.5">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
         {Icon && <Icon className="size-3.5 text-muted-foreground" />}
       </div>
       <p className={cn("font-mono text-xl font-semibold tabular-nums", toneClass)}>{value}</p>

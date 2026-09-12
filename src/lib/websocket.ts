@@ -1,6 +1,14 @@
-const WS_BASE =
-  import.meta.env.VITE_WS_BASE ??
-  `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:8000`
+/**
+ * Base WebSocket : même origine que la page par défaut (`/ws/...`), relayée
+ * vers le backend par le proxy Vite en développement et par nginx en
+ * production. `VITE_WS_BASE` permet de viser un autre hôte si besoin.
+ */
+function defaultWsBase(): string {
+  const protocole = window.location.protocol === "https:" ? "wss:" : "ws:"
+  return `${protocole}//${window.location.host}`
+}
+
+const WS_BASE = import.meta.env.VITE_WS_BASE ?? defaultWsBase()
 
 export function connectDashboardSocket(
   onMessage: (data: unknown) => void,

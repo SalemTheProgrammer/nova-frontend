@@ -5,7 +5,6 @@ import type {
   AutonomyMode,
   AutonomySettings,
   CauseArret,
-  CauseRebut,
   ContexteLigne,
   DashboardResume,
   DispositionPreemption,
@@ -21,6 +20,7 @@ import type {
   MaintenanceEventRead,
   PrelevementMP,
   SparkplugDevice,
+  SparkplugStatus,
   SparkplugTagMapping,
   TagTransformation,
   TargetKpi,
@@ -42,7 +42,6 @@ import type {
   StatutOF,
   StockMP,
   TRSRead,
-  TypeMaintenance,
 } from "@/lib/types"
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api/v1"
@@ -211,6 +210,15 @@ export function getChatHistory(threadId: string) {
 
 export function deleteChatThread(threadId: string) {
   return api.del(`/chat/${encodeURIComponent(threadId)}`)
+}
+
+/** Message d'accueil de Nova (salutation, constats atelier, décisions en
+ * attente), enregistré par le backend comme premier message du thread. */
+export function chatAccueil(threadId?: string) {
+  return api.post<{ thread_id: string; messages: string[] }>(
+    "/chat/accueil",
+    threadId ? { thread_id: threadId } : {},
+  )
 }
 
 // --------------------------- Superviseur autonome --------------------------- //
@@ -427,48 +435,6 @@ export const machinesApi = {
     api.get<MachineEvent[]>(`/machines/${id}/evenements?limit=${limit}`),
 }
 
-// --------------------------- Simulateur --------------------------- //
-export const simulatorApi = {
-  start: (machineId: number, ordreFabricationId?: number | null) =>
-    api.post<Machine>(`/simulateur/machines/${machineId}/start`, {
-      ordre_fabrication_id: ordreFabricationId ?? null,
-    }),
-  stop: (machineId: number) => api.post<Machine>(`/simulateur/machines/${machineId}/stop`),
-  pause: (machineId: number) => api.post<Machine>(`/simulateur/machines/${machineId}/pause`),
-  alarme: (machineId: number, message?: string) =>
-    api.post<Machine>(`/simulateur/machines/${machineId}/alarme`, { message }),
-  cycleTime: (machineId: number, tempsCycleS: number) =>
-    api.post<Machine>(`/simulateur/machines/${machineId}/cycle-time`, {
-      temps_cycle_s: tempsCycleS,
-    }),
-  produireBonne: (machineId: number, quantite = 1) =>
-    api.post<Machine>(`/simulateur/machines/${machineId}/production/bonne`, { quantite }),
-  produireRebut: (machineId: number, quantite = 1, cause: CauseRebut = "AUTRE") =>
-    api.post<Machine>(`/simulateur/machines/${machineId}/production/rebut`, { quantite, cause }),
-  declencherArret: (machineId: number, cause: string, comment?: string) =>
-    api.post<Machine>(`/simulateur/machines/${machineId}/arret/declencher`, { cause, comment }),
-  resoudreArret: (machineId: number, comment?: string) =>
-    api.post<Machine>(`/simulateur/machines/${machineId}/arret/resoudre`, { comment }),
-  demarrerMaintenance: (machineId: number, type: TypeMaintenance, description?: string) =>
-    api.post<Machine>(`/simulateur/machines/${machineId}/maintenance/demarrer`, {
-      type,
-      description,
-    }),
-  terminerMaintenance: (machineId: number, prochaineMaintenance?: string) =>
-    api.post<Machine>(`/simulateur/machines/${machineId}/maintenance/terminer`, {
-      prochaine_maintenance: prochaineMaintenance,
-    }),
-  envoyerTag: (machineId: number, tag: string, valeur: number | string) =>
-    api.post<Machine>(`/simulateur/machines/${machineId}/tag`, { tag, valeur }),
-  // Mode auto + scénarios de démonstration
-  autoStatut: () => api.get<{ actif: boolean }>("/simulateur/auto"),
-  autoStart: () => api.post<{ actif: boolean }>("/simulateur/auto/start"),
-  autoStop: () => api.post<{ actif: boolean }>("/simulateur/auto/stop"),
-  scenario: (nom: "panne-critique" | "derive-qualite" | "rupture-stock") =>
-    api.post<{ scenario: string; message: string }>(`/simulateur/scenarios/${nom}`),
-  reset: () => api.post<{ ok: boolean; message: string }>("/simulateur/reset"),
-}
-
 
 // --------------------------- Arrêts --------------------------- //
 export const downtimeApi = {
@@ -532,6 +498,41 @@ export const kpiApi = {
     if (ligneId != null) qs.set("ligne_id", String(ligneId))
     return api.get<PointOEE[]>(`/kpi/oee-history?${qs.toString()}`)
   },
+  downloadBilanPdf: async (ligneId?: number | null, ofId?: number | null): Promise<void> => {
+    const qs = new URLSearchParams()
+    if (ligneId != null) qs.set("ligne_id", String(ligneId))
+    if (ofId != null) qs.set("of_id", String(ofId))
+    const query = qs.toString() ? `?${qs.toString()}` : ""
+    const res = await fetch(`${API_BASE}/kpi/bilan-pdf${query}`, {
+      headers: { "X-API-Key": API_KEY, ...authHeaders() },
+    })
+    if (!res.ok) {
+      handleUnauthorized(res.status)
+      let message = `Impossible de générer le bilan (${res.status})`
+      try {
+        const data = (await res.json()) as ApiError & { detail?: string }
+        message = data.error?.message ?? data.detail ?? message
+      } catch {
+        // no JSON
+      }
+      throw new Error(message)
+    }
+    const blob = await res.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    const disposition = res.headers.get("content-disposition")
+    let filename = `bilan-of-${ofId ?? "production"}.pdf`
+    if (disposition && disposition.includes("filename=")) {
+      const match = disposition.match(/filename="?([^";]+)"?/)
+      if (match && match[1]) filename = match[1]
+    }
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  },
 }
 
 // --------------------------- AI panel --------------------------- //
@@ -575,10 +576,15 @@ export const adminApi = {
   deleteUser: (id: number) => api.del(`/admin/users/${id}`),
 }
 
-// --------------------------- Sparkplug B & IoT --------------------------- //
+// --------------------------- Sparkplug B (automates / MQTT) --------------------------- //
 export const sparkplugApi = {
+  /** Connexion de l'hôte Sparkplug au broker MQTT. */
+  status: () => api.get<SparkplugStatus>("/sparkplug/status"),
   getDevices: () => api.get<SparkplugDevice[]>("/sparkplug/devices"),
   getDevice: (id: number) => api.get<SparkplugDevice>(`/sparkplug/devices/${id}`),
+  /** Rattache l'automate à une machine MES (`null` pour le détacher). Admin. */
+  bindMachine: (deviceId: number, machineId: number | null) =>
+    api.patch<SparkplugDevice>(`/sparkplug/devices/${deviceId}`, { machine_id: machineId }),
   updateMapping: (
     deviceId: number,
     data: {
@@ -592,20 +598,8 @@ export const sparkplugApi = {
   ) => api.post<SparkplugTagMapping>(`/sparkplug/devices/${deviceId}/mappings`, data),
   deleteMapping: (deviceId: number, mappingId: number) =>
     api.del(`/sparkplug/devices/${deviceId}/mappings/${mappingId}`),
-  birth: () => api.post<Record<string, unknown>>("/sparkplug/simulator/birth"),
-  tick: (data?: {
-    good_increment?: number
-    reject_increment?: number
-    cadence_cpm?: number
-    temperature?: number
-    operator_card?: string
-  }) => api.post<Record<string, unknown>>("/sparkplug/simulator/tick", data ?? {}),
-  unplannedStop: () => api.post<Record<string, unknown>>("/sparkplug/simulator/unplanned-stop"),
-  swipeCard: (card_code: string) =>
-    api.post<Record<string, unknown>>("/sparkplug/simulator/swipe-card", { card_code }),
-  startStream: () => api.post<Record<string, unknown>>("/sparkplug/simulator/start-stream"),
-  stopStream: () => api.post<Record<string, unknown>>("/sparkplug/simulator/stop-stream"),
-  status: () => api.get<{ is_streaming: boolean }>("/sparkplug/simulator/status"),
+  /** Demande aux automates de republier leur état complet (NCMD Rebirth). Admin. */
+  rebirth: () => api.post<{ edge_nodes: number }>("/sparkplug/rebirth"),
 }
 
 // --------------------- Prélèvements Matières Premières (BPF) --------------------- //

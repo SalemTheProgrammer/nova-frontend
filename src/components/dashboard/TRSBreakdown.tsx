@@ -91,8 +91,8 @@ export function TRSBreakdown({ trs }: { trs: TRSRead }) {
                   <span>{row.label}</span>
                   <span className="text-muted-foreground">{minutes(trs.temps[row.key])}</span>
                 </div>
-                <div className="h-2.5 rounded-full bg-muted">
-                  <div className="h-2.5 rounded-full bg-primary" style={{ width: `${width}%` }} />
+                <div className="h-2 rounded-full bg-muted">
+                  <div className="h-2 rounded-full bg-zinc-400 dark:bg-zinc-500" style={{ width: `${width}%` }} />
                 </div>
               </div>
             )
@@ -110,7 +110,7 @@ export function TRSBreakdown({ trs }: { trs: TRSRead }) {
               <div
                 key={key}
                 className={
-                  "rounded-lg border px-3 py-2 text-center " +
+                  "rounded-lg border px-3 py-2 text-center" +
                   (isPrincipale ? "border-destructive/50 bg-destructive/5" : "border-border")
                 }
               >
@@ -119,7 +119,7 @@ export function TRSBreakdown({ trs }: { trs: TRSRead }) {
                   {minutes(String(trs.pertes[secondsKey]))}
                 </p>
                 {isPrincipale && (
-                  <p className="mt-1 text-[10px] font-medium text-destructive">
+                  <p className="mt-1 text-xs font-medium text-destructive">
                     Perte principale
                   </p>
                 )}

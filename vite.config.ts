@@ -13,10 +13,16 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Même topologie qu'en production (nginx) : REST et WebSocket passent par
+    // l'origine du frontend, aucun port backend codé en dur côté client.
     proxy: {
       "/api": {
         target: "http://localhost:8000",
         changeOrigin: true,
+      },
+      "/ws": {
+        target: "ws://localhost:8000",
+        ws: true,
       },
     },
   },

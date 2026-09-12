@@ -6,14 +6,14 @@ import type { User } from "@/lib/api"
  * côté backend (voir `app/core/access.py` et les routeurs REST). Une vue
  * absente de cette table n'est pas restreinte (connexion suffit) : c'est le
  * cas de "assistant" (le périmètre s'applique par outil DANS la conversation,
- * pas par page) et de "qualite"/"jumeau" (aucune catégorie d'outil dédiée
+ * pas par page) et de "qualite" (aucune catégorie d'outil dédiée
  * côté agent). Garder synchronisé avec le mapping backend si l'un des deux
  * change.
  */
 const NAV_CATEGORIES: Partial<Record<NavView, string[]>> = {
   dashboard: ["Supervision / MES"],
-  machines: ["Supervision / MES", "Actions machine"],
   trs: ["Supervision / MES"],
+  afnor: ["Supervision / MES"],
   arrets: ["Supervision / MES", "Actions machine"],
   maintenance: ["Actions machine"],
   stock: ["Fabrication"],
@@ -23,7 +23,6 @@ const NAV_CATEGORIES: Partial<Record<NavView, string[]>> = {
   lignes: ["Fabrication"],
   fournisseurs: ["Fabrication"],
   documents: ["Documents"],
-  simulateur: ["Jumeau numérique", "Actions machine"],
 }
 
 export function canAccessView(user: User | null, view: NavView): boolean {
@@ -74,24 +73,21 @@ const CATEGORY_TOOLS: Record<string, string[]> = {
     "basculer_of_vers_ligne",
     "acquitter_alerte",
   ],
-  "Jumeau numérique": ["piloter_jumeau_numerique"],
 }
 
 /** Première vue accessible à cet utilisateur, dans un ordre de préférence
- * raisonnable — "assistant" n'a jamais de restriction donc termine toujours. */
+ * raisonnable. */
 const ORDRE_REPLI: NavView[] = [
   "dashboard",
   "documents",
   "qualite",
-  "machines",
   "stock",
   "articles",
-  "assistant",
 ]
 
 export function firstAccessibleView(user: User | null): NavView {
   for (const view of ORDRE_REPLI) {
     if (canAccessView(user, view)) return view
   }
-  return "assistant"
+  return "dashboard"
 }

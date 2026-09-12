@@ -8,14 +8,7 @@ import {
   type KeyboardEvent,
 } from "react"
 import { useNavigate } from "react-router-dom"
-import {
-  ArrowLeft,
-  Loader2,
-  MessageCircle,
-  Phone,
-  ShieldCheck,
-  Sparkles,
-} from "lucide-react"
+import { ArrowLeft, Loader2, MessageCircle, Phone, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -126,19 +119,20 @@ function OtpInput({
           onChange={(e) => handleChange(idx, e)}
           onKeyDown={(e) => handleKeyDown(idx, e)}
           className={cn(
-            "size-12 sm:size-14 rounded-2xl border text-center text-xl sm:text-2xl font-bold shadow-sm transition-all outline-none",
-            "bg-slate-50 dark:bg-zinc-900 text-foreground",
-            digit
-              ? "border-violet-600 bg-violet-50/70 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 ring-4 ring-violet-500/15"
-              : "border-slate-200 dark:border-zinc-800 hover:border-violet-400 focus:border-violet-600 focus:ring-4 focus:ring-violet-500/15",
-            disabled && "opacity-50 cursor-not-allowed",
+            "size-12 rounded-lg border bg-background text-center text-2xl font-semibold tabular-nums outline-none transition-colors sm:size-14",
+            digit ? "border-foreground/50" : "border-border hover:border-foreground/30",
+            "focus:border-foreground focus:ring-2 focus:ring-ring/20",
+            disabled && "cursor-not-allowed opacity-50",
           )}
-          aria-label={`Chiffre OTP ${idx + 1}`}
+          aria-label={`Chiffre ${idx + 1} du code`}
         />
       ))}
     </div>
   )
 }
+
+const BOUTON_PRINCIPAL =
+  "h-12 w-full rounded-lg bg-foreground text-base font-medium text-background transition-colors hover:bg-foreground/90 active:scale-[0.99]"
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -146,7 +140,6 @@ export function LoginPage() {
   const [etape, setEtape] = useState<Etape>("telephone")
   const [telephone, setTelephone] = useState("")
   const [code, setCode] = useState("")
-  const [seSouvenir, setSeSouvenir] = useState(true)
   const [erreur, setErreur] = useState<string | null>(null)
   const [chargement, setChargement] = useState(false)
 
@@ -157,7 +150,7 @@ export function LoginPage() {
   async function demanderCode(e?: FormEvent) {
     if (e) e.preventDefault()
     if (!telephone.trim()) {
-      setErreur("Veuillez saisir votre numéro de téléphone.")
+      setErreur("Saisissez votre numéro de téléphone.")
       return
     }
     setErreur(null)
@@ -166,7 +159,7 @@ export function LoginPage() {
       await authApi.requestCode(telephone.trim())
       setEtape("code")
     } catch (err) {
-      setErreur(err instanceof Error ? err.message : "Échec de l'envoi du code.")
+      setErreur(err instanceof Error ? err.message : "Le code n'a pas pu être envoyé.")
     } finally {
       setChargement(false)
     }
@@ -175,7 +168,7 @@ export function LoginPage() {
   async function verifierCode(codeAValider?: string) {
     const codeFinal = (codeAValider ?? code).trim()
     if (codeFinal.length !== 6) {
-      setErreur("Veuillez saisir le code complet à 6 chiffres.")
+      setErreur("Saisissez les 6 chiffres du code.")
       return
     }
     setErreur(null)
@@ -191,112 +184,60 @@ export function LoginPage() {
     }
   }
 
-  return (
-    <div className="flex h-screen w-full overflow-hidden bg-background">
-      {/* Colonne Gauche : Formulaire de connexion épuré avec branding Nova */}
-      <div className="flex h-full w-full flex-col justify-between p-6 sm:p-10 lg:w-1/2 lg:p-12 xl:p-16 overflow-y-auto bg-white dark:bg-zinc-950">
-        {/* En-tête : Logo Nova */}
-        <div className="flex items-center">
-          <img
-            src="/r.png"
-            alt="Nova"
-            className="h-10 sm:h-12 w-auto object-contain"
-          />
-        </div>
+  function revenirAuNumero() {
+    setEtape("telephone")
+    setCode("")
+    setErreur(null)
+  }
 
-        {/* Corps central du formulaire */}
-        <div className="my-auto w-full max-w-md py-6">
-          <div className="mb-8">
-            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-violet-600 dark:text-violet-400 mb-2">
-              <Sparkles className="size-3.5" />
-              <span>Portail d'accès sécurisé</span>
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground">
-              Bonjour,
-              <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-indigo-600 dark:from-violet-400 dark:to-indigo-300">
-                Bienvenue sur Nova
-              </span>
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-              {etape === "telephone"
-                ? "Saisissez votre numéro professionnel pour recevoir votre code d'accès par WhatsApp."
-                : "Entrez le code de vérification à 6 chiffres envoyé sur votre WhatsApp pour vous connecter."}
-            </p>
-          </div>
+  return (
+    <div className="flex h-dvh w-full overflow-hidden bg-background">
+      {/* Formulaire */}
+      <div className="flex h-full w-full flex-col justify-between overflow-y-auto p-6 sm:p-10 lg:w-1/2 lg:p-14">
+        <img src="/r.png" alt="Nova" className="h-10 w-auto self-start object-contain" />
+
+        <div className="my-auto w-full max-w-md py-8">
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Connexion à Nova</h1>
+          <p className="mt-3 text-base text-muted-foreground">
+            {etape === "telephone"
+              ? "Saisissez votre numéro professionnel : un code d'accès vous est envoyé par WhatsApp."
+              : "Entrez le code à 6 chiffres reçu sur WhatsApp."}
+          </p>
 
           {etape === "telephone" ? (
-            <form onSubmit={demanderCode} className="space-y-5">
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="tel"
-                  className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Numéro de téléphone professionnel
+            <form onSubmit={demanderCode} className="mt-8 space-y-5">
+              <div className="space-y-2">
+                <label htmlFor="tel" className="block text-sm font-medium">
+                  Numéro de téléphone
                 </label>
                 <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted-foreground">
-                    <Phone className="size-4" />
-                  </div>
+                  <Phone className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="tel"
                     type="tel"
                     autoComplete="tel"
-                    placeholder="+216 55 516 823"
+                    placeholder="+216 XX XXX XXX"
                     value={telephone}
                     onChange={(ev) => setTelephone(ev.target.value)}
                     required
-                    className="h-12 pl-10 text-base rounded-xl border-slate-200 dark:border-zinc-800 focus:border-violet-600 focus:ring-4 focus:ring-violet-500/15 transition-all"
+                    className="h-12 rounded-lg pl-10 text-base focus:border-foreground focus:ring-2 focus:ring-ring/20"
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Format international E.164. Votre code de session à usage unique vous sera envoyé
-                  instantanément.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between text-xs pt-0.5">
-                <label className="flex items-center gap-2 text-muted-foreground hover:text-foreground cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={seSouvenir}
-                    onChange={(e) => setSeSouvenir(e.target.checked)}
-                    className="size-4 rounded-md border-slate-300 text-violet-600 focus:ring-violet-500 accent-violet-600 cursor-pointer"
-                  />
-                  <span>Se souvenir de cet appareil</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={() =>
-                    alert(
-                      "Pour toute assistance ou demande d'accès, veuillez contacter votre responsable d'atelier ou l'administrateur Nova.",
-                    )
-                  }
-                  className="text-violet-600 hover:text-violet-700 dark:text-violet-400 font-medium hover:underline"
-                >
-                  Besoin d'aide ?
-                </button>
+                <p className="text-sm text-muted-foreground">Format international, indicatif compris.</p>
               </div>
 
               {erreur && (
-                <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-                  {erreur}
-                </div>
+                <div className="rounded-lg bg-destructive/10 px-3.5 py-3 text-sm text-destructive">{erreur}</div>
               )}
 
-              <Button
-                type="submit"
-                size="lg"
-                className="w-full h-12 rounded-xl bg-violet-600 hover:bg-violet-700 active:scale-[0.99] text-white font-semibold shadow-lg shadow-violet-600/25 transition-all text-base"
-                disabled={chargement}
-              >
+              <Button type="submit" className={BOUTON_PRINCIPAL} disabled={chargement}>
                 {chargement ? (
                   <>
-                    <Loader2 className="size-4 animate-spin mr-2" /> Envoi en cours…
+                    <Loader2 className="mr-2 size-4 animate-spin" /> Envoi en cours…
                   </>
                 ) : (
                   <>
-                    <MessageCircle className="size-4 mr-2" /> Recevoir le code par WhatsApp
+                    <MessageCircle className="mr-2 size-4" /> Recevoir le code par WhatsApp
                   </>
                 )}
               </Button>
@@ -305,119 +246,77 @@ export function LoginPage() {
             <form
               onSubmit={(e) => {
                 e.preventDefault()
-                verifierCode()
+                void verifierCode()
               }}
-              className="space-y-6"
+              className="mt-8 space-y-6"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Code de vérification (OTP)
-                  </label>
+                  <span className="text-sm font-medium">Code de vérification</span>
                   <button
                     type="button"
-                    onClick={() => {
-                      setEtape("telephone")
-                      setCode("")
-                      setErreur(null)
-                    }}
-                    className="text-xs font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 hover:underline"
+                    onClick={revenirAuNumero}
+                    className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                   >
                     Changer de numéro
                   </button>
                 </div>
-
                 <OtpInput
                   value={code}
                   onChange={setCode}
-                  onComplete={(completedCode) => verifierCode(completedCode)}
+                  onComplete={(complet) => void verifierCode(complet)}
                   disabled={chargement}
                 />
-
-                <p className="text-xs text-muted-foreground pt-1">
-                  Code à 6 chiffres envoyé au{" "}
-                  <span className="font-semibold text-foreground">{telephone}</span>.
+                <p className="text-sm text-muted-foreground">
+                  Envoyé au <span className="font-medium text-foreground">{telephone}</span>.
                 </p>
               </div>
 
               {erreur && (
-                <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-                  {erreur}
-                </div>
+                <div className="rounded-lg bg-destructive/10 px-3.5 py-3 text-sm text-destructive">{erreur}</div>
               )}
 
-              <Button
-                type="submit"
-                size="lg"
-                className="w-full h-12 rounded-xl bg-violet-600 hover:bg-violet-700 active:scale-[0.99] text-white font-semibold shadow-lg shadow-violet-600/25 transition-all text-base"
-                disabled={chargement || code.length !== 6}
-              >
+              <Button type="submit" className={BOUTON_PRINCIPAL} disabled={chargement || code.length !== 6}>
                 {chargement ? (
                   <>
-                    <Loader2 className="size-4 animate-spin mr-2" /> Validation…
+                    <Loader2 className="mr-2 size-4 animate-spin" /> Validation…
                   </>
                 ) : (
                   <>
-                    <ShieldCheck className="size-4 mr-2" /> Valider et se connecter
+                    <ShieldCheck className="mr-2 size-4" /> Se connecter
                   </>
                 )}
               </Button>
 
               <button
                 type="button"
-                onClick={() => {
-                  setEtape("telephone")
-                  setCode("")
-                  setErreur(null)
-                }}
-                className="flex w-full items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                onClick={revenirAuNumero}
+                className="flex w-full items-center justify-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
-                <ArrowLeft className="size-3.5" /> Revenir à la saisie du numéro
+                <ArrowLeft className="size-4" /> Revenir au numéro
               </button>
             </form>
           )}
         </div>
 
-        {/* Pied de page colonne gauche */}
-        <div className="border-t border-border pt-4 text-center text-xs text-muted-foreground">
-          Vous n'avez pas d'accès ?{" "}
-          <span className="font-semibold text-foreground">
-            Contactez votre responsable d'atelier ou administrateur
-          </span>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Pas encore d'accès ? Demandez-le à votre responsable d'atelier ou à l'administrateur Nova.
+        </p>
       </div>
 
-      {/* Colonne Droite : Showcase visuel Nova avec photographie industrielle ultra-réaliste */}
-      <div className="relative hidden h-full w-1/2 overflow-hidden bg-gradient-to-br from-[#120726] via-[#200b3f] to-[#0a0314] lg:flex flex-col justify-end p-8 xl:p-12">
-        {/* Photographie ultra-réaliste d'usine intelligente */}
+      {/* Visuel */}
+      <div className="relative hidden h-full w-1/2 flex-col justify-end overflow-hidden bg-zinc-900 p-12 lg:flex">
         <img
           src="/login-illustration.jpg"
-          alt="Nova Smart Factory & Automation"
-          className="absolute inset-0 h-full w-full object-cover object-center transform scale-[1.02] hover:scale-105 transition-transform duration-1000 ease-out"
+          alt="Ligne de conditionnement pharmaceutique"
+          className="absolute inset-0 h-full w-full object-cover"
         />
-
-        {/* Overlay sombre progressif pour lisibilité parfaite des textes et badges */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/20" />
-
-
-
-        {/* Bas de page droit : Témoignage épuré dans l'esprit SoftQA (sans boîte opaque) */}
-        <div className="relative z-10 max-w-lg space-y-3 text-white">
-          <span className="text-3xl font-serif text-violet-300 leading-none select-none block">“</span>
-          <p className="text-base sm:text-lg text-slate-100 font-medium leading-relaxed drop-shadow-sm">
-            « Nova MES a transformé le pilotage de nos lignes de conditionnement. La détection des anomalies et le calcul TRS se font en temps réel avec une précision chirurgicale. »
+        <div className="pointer-events-none absolute inset-0 bg-black/45" />
+        <div className="relative z-10 max-w-md text-white">
+          <p className="text-2xl font-semibold leading-snug">Supervision de production en temps réel.</p>
+          <p className="mt-2 text-base text-white/80">
+            TRS, arrêts, qualité et ordres de fabrication, alimentés directement par vos automates.
           </p>
-          <div className="flex items-center gap-3 pt-1">
-            <div className="size-9 rounded-full bg-gradient-to-tr from-violet-500 to-indigo-500 flex items-center justify-center text-xs font-bold text-white shadow-md">
-              MC
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-white drop-shadow-sm">Marc Collet</p>
-              <p className="text-xs text-violet-200/80 drop-shadow-sm">
-                Directeur des Opérations Industrielles · Usine Agro & Pharma
-              </p>
-            </div>
-          </div>
         </div>
       </div>
     </div>

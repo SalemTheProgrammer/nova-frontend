@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, Check, Loader2, User } from "lucide-react"
+import { AlertTriangle, Check, Loader2, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ArtifactCard } from "@/components/agent/ArtifactCard"
 import type { AgentSegment, AgentTurn } from "@/hooks/useAgentChat"
@@ -32,6 +32,8 @@ const TOOL_LABEL: Record<string, string> = {
   lancer_maintenance: "Commande SCADA : maintenance",
   basculer_of_vers_ligne: "Re-routage de l'OF",
   acquitter_alerte: "Acquittement de l'alerte",
+  lister_decisions_en_attente: "Lecture des décisions en attente",
+  decider_proposition: "Décision du superviseur",
   envoyer_rapport: "Envoi du bilan",
   envoyer_message: "Envoi du message",
 }
@@ -50,6 +52,7 @@ const OUTILS_ACTION = new Set([
   "lancer_maintenance",
   "basculer_of_vers_ligne",
   "acquitter_alerte",
+  "decider_proposition",
   "envoyer_rapport",
   "envoyer_message",
 ])
@@ -69,25 +72,27 @@ function ToolStep({
   const enAttenteConfirmation = segment.artifact?.kind === "confirmation_attente"
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 w-full">
       <div
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium",
-          running && estAction && "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-          running && !estAction && "border-primary/40 bg-primary/5 text-primary",
+          "inline-flex items-center gap-2 rounded-xl border px-2.5 py-1.5 text-xs font-medium shadow-xs transition-all",
+          running && estAction && "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400 animate-pulse",
+          running && !estAction && "border-border bg-muted/60 text-foreground",
           !running && enAttenteConfirmation &&
             "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-          !running && !enAttenteConfirmation && "border-border bg-muted/40 text-muted-foreground",
+          !running && !enAttenteConfirmation && "border-border/80 bg-muted/40 text-muted-foreground",
         )}
       >
-        {running ? (
-          <Loader2 className="size-3 animate-spin" />
-        ) : enAttenteConfirmation ? (
-          <AlertTriangle className="size-3" />
-        ) : (
-          <Check className="size-3 text-emerald-600 dark:text-emerald-400" />
-        )}
-        {TOOL_LABEL[segment.name] ?? segment.name}
+        <div className="flex size-4 shrink-0 items-center justify-center">
+          {running ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : enAttenteConfirmation ? (
+            <AlertTriangle className="size-3.5" />
+          ) : (
+            <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+          )}
+        </div>
+        <span>{TOOL_LABEL[segment.name] ?? segment.name}</span>
       </div>
       {segment.artifact && (
         <ArtifactCard artifact={segment.artifact} onQuickReply={onQuickReply} />
@@ -105,24 +110,37 @@ export function AgentTurnView({
 }) {
   const isUser = turn.role === "user"
   return (
-    <div className="flex items-start gap-2.5">
+    <div className={cn("flex items-start gap-2.5", isUser && "flex-row-reverse")}>
       <div
         className={cn(
-          "flex size-7 shrink-0 items-center justify-center rounded-full",
-          isUser ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary",
+          "flex size-8 shrink-0 items-center justify-center rounded-xl shadow-xs transition-all",
+          isUser
+            ? "bg-foreground text-background font-medium"
+            : "border border-border/80 bg-muted text-foreground p-1.5",
         )}
       >
-        {isUser ? <User className="size-3.5" /> : <Bot className="size-3.5" />}
+        {isUser ? (
+          <User className="size-4" />
+        ) : (
+          <img src="/nova-logo.png" alt="Nova" className="size-5 object-contain" />
+        )}
       </div>
-      <div className="min-w-0 flex-1 space-y-2 pt-0.5">
-        <p className="text-[11px] font-medium text-muted-foreground">
-          {isUser ? "Vous" : "Nova"}
-        </p>
+      <div className={cn("min-w-0 flex-1 space-y-1.5", isUser && "flex flex-col items-end")}>
+        <div className="flex items-center gap-1.5 px-1">
+          <span className="text-xs font-semibold text-foreground">
+            {isUser ? "Vous" : "Nova"}
+          </span>
+        </div>
         {turn.segments.map((segment, i) =>
           segment.type === "text" ? (
             <div
               key={i}
-              className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground"
+              className={cn(
+                "whitespace-pre-wrap break-words text-xs sm:text-sm leading-relaxed",
+                isUser
+                  ? "rounded-2xl rounded-tr-xs bg-muted/80 border border-border/70 px-3.5 py-2.5 text-foreground shadow-xs max-w-[88%]"
+                  : "rounded-2xl rounded-tl-xs bg-background border border-border/80 px-3.5 py-2.5 text-foreground shadow-xs w-full",
+              )}
             >
               {segment.content}
             </div>

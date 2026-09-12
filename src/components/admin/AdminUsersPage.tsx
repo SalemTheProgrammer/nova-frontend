@@ -83,11 +83,11 @@ export function AdminUsersPage() {
 
   return (
     <div className="min-h-dvh bg-background">
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-background/95 px-4 py-3 backdrop-blur md:px-6">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-background/95 px-4 py-3 md:px-6">
         <div className="flex items-center gap-2.5">
           <ShieldCheck className="size-5 text-violet-600 dark:text-violet-400" />
           <div>
-            <h1 className="text-base font-bold leading-tight">Administration</h1>
+            <h1 className="text-base font-semibold leading-tight">Administration</h1>
             <p className="text-xs text-muted-foreground">Numéros autorisés & accès aux outils</p>
           </div>
         </div>
@@ -153,22 +153,22 @@ export function AdminUsersPage() {
                       </td>
                       <td className="px-3 py-2.5">
                         {user.is_admin ? (
-                          <span className="rounded-md bg-violet-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                          <span className="rounded-md bg-violet-600 px-1.5 py-0.5 text-xs font-semibold text-white">
                             ADMIN
                           </span>
                         ) : (
-                          <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                             {user.outils_autorises.length}
                           </span>
                         )}
                       </td>
                       <td className="px-3 py-2.5">
                         {user.actif ? (
-                          <span className="rounded-md bg-emerald-600/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                          <span className="rounded-md bg-emerald-600/10 px-1.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                             actif
                           </span>
                         ) : (
-                          <span className="rounded-md bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+                          <span className="rounded-md bg-destructive/10 px-1.5 py-0.5 text-xs font-medium text-destructive">
                             inactif
                           </span>
                         )}
@@ -347,7 +347,7 @@ function UserEditor({
     <div className="space-y-4 rounded-xl border border-border p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-bold">{user.telephone}</h2>
+          <h2 className="text-base font-semibold">{user.telephone}</h2>
           {user.is_admin && (
             <span className="text-xs font-medium text-violet-600 dark:text-violet-400">
               Administrateur — accès à tous les outils
@@ -440,7 +440,7 @@ function UserForm({
 
   return (
     <form onSubmit={creer} className="space-y-4 rounded-xl border border-border p-4">
-      <h2 className="text-base font-bold">Nouveau numéro</h2>
+      <h2 className="text-base font-semibold">Nouveau numéro</h2>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label htmlFor="new-tel" className="mb-1.5 block text-sm font-medium">

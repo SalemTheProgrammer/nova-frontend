@@ -1,21 +1,12 @@
-import React, { useEffect, useState } from "react"
-import {
-  Activity,
-  AlertTriangle,
-  CreditCard,
-  Pause,
-  Play,
-  Radio,
-  RefreshCw,
-  Save,
-  Sliders,
-  Sparkles,
-  X,
-  Zap,
-} from "lucide-react"
-import { sparkplugApi } from "@/lib/api"
+import { useCallback, useEffect, useState } from "react"
+import { Link2, Radio, RefreshCw, Save, Trash2, X } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { machinesApi, sparkplugApi } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
 import type {
+  Machine,
   SparkplugDevice,
+  SparkplugStatus,
   SparkplugTagMapping,
   TagTransformation,
   TargetKpi,
@@ -27,540 +18,446 @@ interface SparkplugStudioModalProps {
   onActionComplete?: () => void
 }
 
-const CARTE_OPTIONS = [
-  {
-    code: "CARTE_REGLAGE",
-    label: "Réglage Machine",
-    icon: "🔧",
-    cause: "REGLAGE_MACHINE",
-    color: "border-amber-400/40 bg-amber-500/10 text-amber-900 hover:bg-amber-500/20",
-  },
-  {
-    code: "CARTE_PANNE_MECA",
-    label: "Panne Mécanique",
-    icon: "⚙️",
-    cause: "PANNE_MECANIQUE",
-    color: "border-rose-400/40 bg-rose-500/10 text-rose-900 hover:bg-rose-500/20",
-  },
-  {
-    code: "CARTE_PANNE_ELEC",
-    label: "Panne Électrique",
-    icon: "⚡",
-    cause: "PANNE_ELECTRIQUE",
-    color: "border-purple-400/40 bg-purple-500/10 text-purple-900 hover:bg-purple-500/20",
-  },
-  {
-    code: "CARTE_CHANGEMENT_SERIE",
-    label: "Changement Série",
-    icon: "🔄",
-    cause: "CHANGEMENT_SERIE",
-    color: "border-blue-400/40 bg-blue-500/10 text-blue-900 hover:bg-blue-500/20",
-  },
-  {
-    code: "CARTE_NETTOYAGE",
-    label: "Nettoyage BPF",
-    icon: "🧹",
-    cause: "NETTOYAGE",
-    color: "border-teal-400/40 bg-teal-500/10 text-teal-900 hover:bg-teal-500/20",
-  },
-  {
-    code: "CARTE_REPRISE",
-    label: "Reprise Production",
-    icon: "▶️",
-    cause: "FIN_ARRET",
-    color: "border-emerald-500/40 bg-emerald-500/10 text-emerald-900 hover:bg-emerald-500/20 font-bold",
-  },
-]
-
 const TARGET_KPI_OPTIONS: { value: TargetKpi; label: string }[] = [
-  { value: "BONNES_PIECES", label: "Bonnes pièces produites" },
-  { value: "REJETS", label: "Rejets / rebuts" },
-  { value: "CADENCE", label: "Cadence (coups / min)" },
-  { value: "STATUT_MACHINE", label: "Statut machine (Marche/Arrêt)" },
-  { value: "TEMPERATURE", label: "Température capteur (°C)" },
-  { value: "VIBRATION", label: "Vibration capteur (mm/s)" },
-  { value: "OPERATOR_CARD", label: "Badge RFID Opérateur (Arret/Reprise)" },
+  { value: "STATUT_MACHINE", label: "État machine" },
+  { value: "CAUSE_ARRET", label: "Cause d'arrêt" },
+  { value: "BONNES_PIECES", label: "Compteur de pièces bonnes (total)" },
+  { value: "REJETS", label: "Compteur de rebuts (total)" },
+  { value: "CAUSE_REBUT", label: "Cause de rebut" },
+  { value: "CADENCE", label: "Cadence (unités / min)" },
+  { value: "TEMPERATURE", label: "Température (°C)" },
+  { value: "PUISSANCE", label: "Puissance (kW)" },
+  { value: "OPERATOR_CARD", label: "Badge opérateur (qualification d'arrêt)" },
 ]
 
 const TRANSFORMATION_OPTIONS: { value: TagTransformation; label: string }[] = [
   { value: "DIRECT", label: "Directe (valeur brute)" },
-  { value: "SCALE_FACTOR", label: "Facteur d'échelle (multiplication)" },
-  { value: "THRESHOLD_STATE", label: "Seuil binaire (supérieur à X -> Marche)" },
-  { value: "OPERATOR_CARD", label: "Code carte opérateur RFID" },
+  { value: "SCALE_FACTOR", label: "Facteur d'échelle (× paramètre)" },
+  { value: "THRESHOLD_STATE", label: "Seuil (> paramètre → MARCHE)" },
+  { value: "OPERATOR_CARD", label: "Code badge opérateur" },
 ]
 
-export const SparkplugStudioModal: React.FC<SparkplugStudioModalProps> = ({
-  open,
-  onClose,
-  onActionComplete,
-}) => {
-  const [activeTab, setActiveTab] = useState<"demo" | "mappings">("demo")
-  const [device, setDevice] = useState<SparkplugDevice | null>(null)
-  const [isStreaming, setIsStreaming] = useState(false)
-  const [lastFeedback, setLastFeedback] = useState<string | null>(null)
-  const [editingMapping, setEditingMapping] = useState<Partial<SparkplugTagMapping> | null>(null)
+/** Les dates backend sont en UTC naïf (sans « Z ») : on les lit comme UTC. */
+function formatHeure(value: string | null): string {
+  if (!value) return "—"
+  const iso = /[zZ]|[+-]\d\d:?\d\d$/.test(value) ? value : `${value}Z`
+  return new Date(iso).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "medium" })
+}
 
-  const chargerDevice = async () => {
+function formatValeur(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—"
+  if (typeof value === "number") return value.toLocaleString("fr-FR")
+  if (typeof value === "boolean") return value ? "vrai" : "faux"
+  return String(value)
+}
+
+/** Studio des automates Sparkplug B : état du broker, registre des devices,
+ * rattachement aux machines MES et règles tag → KPI. Lecture pour tous les
+ * utilisateurs de la supervision ; modifications réservées à l'administrateur. */
+export function SparkplugStudioModal({ open, onClose, onActionComplete }: SparkplugStudioModalProps) {
+  const { user } = useAuth()
+  const isAdmin = user?.is_admin ?? false
+  const [status, setStatus] = useState<SparkplugStatus | null>(null)
+  const [devices, setDevices] = useState<SparkplugDevice[]>([])
+  const [machines, setMachines] = useState<Machine[]>([])
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [editing, setEditing] = useState<SparkplugTagMapping | null>(null)
+  const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
     try {
-      const devices = await sparkplugApi.getDevices()
-      if (devices && devices.length > 0) {
-        setDevice(devices[0])
+      // Chargements indépendants : l'échec du registre des devices ne doit pas
+      // masquer l'état du broker (et inversement).
+      const [st, devs, machs] = await Promise.allSettled([
+        sparkplugApi.status(),
+        sparkplugApi.getDevices(),
+        machinesApi.list(),
+      ])
+      if (st.status === "fulfilled") setStatus(st.value)
+      if (machs.status === "fulfilled") setMachines(machs.value)
+      if (devs.status === "fulfilled") {
+        const liste = devs.value
+        setDevices(liste)
+        setSelectedId((current) =>
+          current != null && liste.some((d) => d.id === current) ? current : (liste[0]?.id ?? null),
+        )
       }
-      const st = await sparkplugApi.status()
-      setIsStreaming(st.is_streaming)
-    } catch (err) {
-      console.error("Erreur chargement device Sparkplug B", err)
+      const echec = [st, devs, machs].find((r) => r.status === "rejected")
+      if (echec?.status === "rejected") {
+        const e = echec.reason
+        setFeedback({
+          ok: false,
+          text: `Chargement partiel : ${e instanceof Error ? e.message : "erreur inconnue"}`,
+        })
+      }
+    } finally {
+      setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    if (open) {
-      void chargerDevice()
-    }
-  }, [open])
+    if (open) void load()
+  }, [open, load])
 
   if (!open) return null
 
-  const handleToggleStream = async () => {
-    try {
-      if (isStreaming) {
-        await sparkplugApi.stopStream()
-        setIsStreaming(false)
-        setLastFeedback("Flux de télémétrie Sparkplug B arrêté")
-      } else {
-        await sparkplugApi.startStream()
-        setIsStreaming(true)
-        setLastFeedback("Flux continu actif : émission DDATA toutes les 2s")
-      }
-      onActionComplete?.()
-    } catch {
-      setLastFeedback("Erreur lors de la modification du flux")
-    }
-  }
+  const device = devices.find((d) => d.id === selectedId) ?? null
+  const machinesLibres = machines.filter(
+    (m) => m.id === device?.machine_id || !devices.some((d) => d.machine_id === m.id),
+  )
 
-  const handleTriggerUnplannedStop = async () => {
+  async function run(action: () => Promise<unknown>, succes: string) {
     try {
-      await sparkplugApi.unplannedStop()
-      setLastFeedback(
-        `Arrêt non planifié détecté ! Cadence: 0 CPM -> Statut: ARRET (MICRO_ARRET)`
-      )
-      await chargerDevice()
+      await action()
+      setFeedback({ ok: true, text: succes })
+      setEditing(null)
+      await load()
       onActionComplete?.()
-    } catch {
-      setLastFeedback("Erreur lors du déclenchement de l'arrêt")
-    }
-  }
-
-  const handleSwipeCard = async (cardCode: string, cardLabel: string) => {
-    try {
-      await sparkplugApi.swipeCard(cardCode)
-      setLastFeedback(`Carte "${cardLabel}" scannée via MQTT tag DigitalIn/OperatorCard`)
-      await chargerDevice()
-      onActionComplete?.()
-    } catch {
-      setLastFeedback("Erreur lors du scan de la carte")
-    }
-  }
-
-  const handleSendDbirth = async () => {
-    try {
-      await sparkplugApi.birth()
-      setLastFeedback("Trame DBIRTH envoyée : catalogue de métriques ISO/IEC 20237 synchronisé")
-      await chargerDevice()
-      onActionComplete?.()
-    } catch {
-      setLastFeedback("Erreur envoi DBIRTH")
-    }
-  }
-
-  const handleSaveMapping = async (m: SparkplugTagMapping) => {
-    if (!device) return
-    try {
-      await sparkplugApi.updateMapping(device.id, {
-        tag_name: m.tag_name,
-        target_kpi: m.target_kpi,
-        transformation: m.transformation,
-        formula_param: m.formula_param,
-        actif: m.actif,
-      })
-      setLastFeedback(`Règle pour "${m.tag_name}" mise à jour`)
-      setEditingMapping(null)
-      await chargerDevice()
-    } catch {
-      setLastFeedback("Erreur enregistrement de la règle")
+    } catch (e) {
+      setFeedback({ ok: false, text: e instanceof Error ? e.message : "Action impossible" })
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-white rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+      <div className="relative flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-950">
+        {/* En-tête : état réel de la connexion au broker */}
+        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-5 dark:border-zinc-800 dark:bg-zinc-900/40">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-600">
-              <Radio className="w-5 h-5" />
+            <div className="flex size-10 items-center justify-center rounded-xl border border-orange-500/20 bg-orange-500/10 text-orange-600">
+              <Radio className="size-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-slate-900">
-                  Sparkplug B MQTT Studio
-                </h2>
-                <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-md bg-orange-100 text-orange-700 border border-orange-200/60">
-                  ISO/IEC 20237
+                <h2 className="text-lg font-semibold">Automates Sparkplug B</h2>
+                <span
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium",
+                    status?.connected
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-rose-200 bg-rose-50 text-rose-700",
+                  )}
+                >
+                  <span className={cn("size-2 rounded-full", status?.connected ? "bg-emerald-500" : "bg-rose-500")} />
+                  {status == null ? "État inconnu" : status.connected ? "Broker connecté" : "Broker déconnecté"}
                 </span>
-                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Connecté
-                </div>
               </div>
               <p className="text-xs text-slate-500">
-                Node:{" "}
-                <span className="font-mono text-slate-700">
-                  {device?.edge_node_id ?? "Edge_Ligne_01"}
-                </span>{" "}
-                | Device:{" "}
-                <span className="font-mono text-slate-700">
-                  {device?.device_id ?? "Automate_Blister_01"}
-                </span>
+                {status?.broker ?? "Broker non configuré"} · groupe{" "}
+                <span className="font-mono">{status?.group_id ?? "—"}</span> · hôte{" "}
+                <span className="font-mono">{status?.host_id ?? "—"}</span>
+                {status?.last_error && <span className="text-rose-600"> · {status.last_error}</span>}
               </p>
             </div>
           </div>
-
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition"
-          >
-            <X className="w-5 h-5" />
+          <button onClick={onClose} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Fermer">
+            <X className="size-5" />
           </button>
         </div>
 
-        {/* Tab navigation */}
-        <div className="flex border-b border-slate-200/60 bg-white px-6 gap-6 text-xs font-semibold">
-          <button
-            onClick={() => setActiveTab("demo")}
-            className={`py-3 border-b-2 flex items-center gap-2 transition ${
-              activeTab === "demo"
-                ? "border-orange-600 text-orange-600 font-bold"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
+        {feedback && (
+          <div
+            className={cn(
+              "mx-6 mt-3 flex items-center justify-between rounded-xl px-3 py-2 text-xs",
+              feedback.ok ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800",
+            )}
           >
-            <Zap className="w-4 h-4" />
-            Télémétrie Live & Cartes Opérateurs
-          </button>
-          <button
-            onClick={() => setActiveTab("mappings")}
-            className={`py-3 border-b-2 flex items-center gap-2 transition ${
-              activeTab === "mappings"
-                ? "border-orange-600 text-orange-600 font-bold"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <Sliders className="w-4 h-4" />
-            Configuration & Mappage des Tags
-          </button>
-        </div>
-
-        {/* Notification pill */}
-        {lastFeedback && (
-          <div className="mx-6 mt-3 px-3 py-2 rounded-xl bg-slate-900 text-white text-xs flex items-center justify-between shadow-sm animate-in fade-in">
-            <span className="flex items-center gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-orange-400" />
-              {lastFeedback}
-            </span>
-            <button
-              onClick={() => setLastFeedback(null)}
-              className="text-slate-400 hover:text-white ml-2"
-            >
+            <span>{feedback.text}</span>
+            <button onClick={() => setFeedback(null)} className="ml-2 opacity-60 hover:opacity-100" aria-label="Masquer">
               ×
             </button>
           </div>
         )}
 
-        {/* Modal body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {activeTab === "demo" ? (
-            <>
-              {/* Live Streaming Controller */}
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-50/70 to-amber-50/40 border border-orange-200/60 flex items-center justify-between">
-                <div className="flex items-center gap-3.5">
-                  <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition ${
-                      isStreaming
-                        ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                        : "bg-slate-200 text-slate-600"
-                    }`}
-                  >
-                    <Activity className={`w-5 h-5 ${isStreaming ? "animate-pulse" : ""}`} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">
-                      Flux Télémétrie Continu (2s)
-                    </h3>
-                    <p className="text-xs text-slate-600">
-                      {isStreaming
-                        ? "Émission continue de trames DDATA vers le bus Sparkplug B"
-                        : "Le flux automatique est en pause"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleSendDbirth}
-                    className="px-3 py-2 text-xs font-semibold rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm transition"
-                  >
-                    Trame DBIRTH
-                  </button>
-                  <button
-                    onClick={handleToggleStream}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-2 shadow-sm transition ${
-                      isStreaming
-                        ? "bg-rose-600 hover:bg-rose-700 text-white"
-                        : "bg-orange-600 hover:bg-orange-700 text-white"
-                    }`}
-                  >
-                    {isStreaming ? (
-                      <>
-                        <Pause className="w-3.5 h-3.5" /> Arrêter Flux
-                      </>
-                    ) : (
-                      <>
-                        <Play className="w-3.5 h-3.5" /> Démarrer Flux
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Unplanned Stoppage Trigger */}
-              <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-amber-600" />
-                      <h4 className="text-sm font-bold text-slate-900">
-                        Scénario : Détection Arrêt Non Planifié
-                      </h4>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1 max-w-xl">
-                      Simule la situation où le moteur tourne sous tension mais aucune pièce n&apos;est
-                      détectée sur le convoyeur. L&apos;IA bascule automatiquement la machine en{" "}
-                      <span className="font-semibold text-rose-600">Arrêt Non Planifié</span>.
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={handleTriggerUnplannedStop}
-                    className="px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 hover:bg-amber-100 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
-                  >
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                    Simuler Cadence = 0
-                  </button>
-                </div>
-              </div>
-
-              {/* RFID Operator Card Swipes */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-slate-700" />
-                    <h4 className="text-sm font-bold text-slate-900">
-                      Cartes Opérateurs RFID (Qualification Immédiate)
-                    </h4>
-                  </div>
-                  <span className="text-[11px] text-slate-500">
-                    Tag MQTT: <code className="font-mono text-slate-700">DigitalIn/OperatorCard</code>
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          {/* Registre des devices */}
+          <aside className="w-64 shrink-0 overflow-y-auto border-r border-slate-100 p-3 dark:border-zinc-800">
+            <p className="px-2 pb-2 text-xs font-semibold text-slate-500">
+              Devices ({devices.length})
+            </p>
+            {devices.length === 0 && (
+              <p className="px-2 text-xs text-slate-500">
+                Aucun automate n'a encore publié de naissance (DBIRTH) sur ce broker.
+              </p>
+            )}
+            {devices.map((d) => (
+              <button
+                key={d.id}
+                onClick={() => {
+                  setSelectedId(d.id)
+                  setEditing(null)
+                }}
+                className={cn(
+                  "mb-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs transition",
+                  d.id === selectedId ? "bg-orange-50 text-orange-900" : "hover:bg-slate-50 dark:hover:bg-zinc-900",
+                )}
+              >
+                <span className={cn("size-2 shrink-0 rounded-full", d.online ? "bg-emerald-500" : "bg-slate-300")} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-mono font-semibold">{d.device_id}</span>
+                  <span className="block truncate text-xs text-slate-500">
+                    {d.edge_node_id} · {d.machine_code ?? "non rattaché"}
                   </span>
-                </div>
+                </span>
+              </button>
+            ))}
+          </aside>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {CARTE_OPTIONS.map((carte) => (
-                    <button
-                      key={carte.code}
-                      onClick={() => handleSwipeCard(carte.code, carte.label)}
-                      className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between group shadow-sm ${carte.color}`}
+          {/* Détail du device sélectionné */}
+          <div className="min-w-0 flex-1 space-y-5 overflow-y-auto p-6">
+            {!device ? (
+              <p className="text-sm text-slate-500">
+                Démarrez l'usine simulée (<span className="font-mono">python -m nova_sim run</span>) ou
+                raccordez un automate au broker : il apparaîtra ici à sa première naissance.
+              </p>
+            ) : (
+              <>
+                <section className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+                  <Info label="Statut" value={device.online ? "En ligne" : "Hors ligne"} />
+                  <Info label="Topic" value={`${device.group_id}/${device.edge_node_id}/${device.device_id}`} mono />
+                  <Info label="Dernière naissance" value={formatHeure(device.last_birth_at)} />
+                  <Info label="Dernière donnée" value={formatHeure(device.last_data_at)} />
+                </section>
+
+                <section className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200/80 p-4 dark:border-zinc-800">
+                  <Link2 className="size-4 text-slate-500" />
+                  <span className="text-sm font-semibold">Machine MES pilotée</span>
+                  {isAdmin ? (
+                    <select
+                      value={device.machine_id ?? ""}
+                      onChange={(e) => {
+                        const machineId = e.target.value ? Number(e.target.value) : null
+                        void run(
+                          () => sparkplugApi.bindMachine(device.id, machineId),
+                          machineId == null ? "Automate détaché." : "Automate rattaché.",
+                        )
+                      }}
+                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
                     >
-                      <div className="flex items-center justify-between w-full">
-                        <span className="text-xl">{carte.icon}</span>
-                        <span className="text-[10px] font-mono text-slate-500 uppercase">
-                          RFID
-                        </span>
-                      </div>
-                      <div className="mt-2">
-                        <div className="text-xs font-bold">{carte.label}</div>
-                        <div className="text-[10px] font-mono text-slate-600 mt-0.5 truncate">
-                          {carte.code}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          ) : (
-            /* Mappings Studio */
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">
-                    Règles de Traduction Tags MQTT ➔ KPIs MES
-                  </h4>
-                  <p className="text-xs text-slate-500">
-                    Configurez comment chaque tag Sparkplug B met à jour le cockpit MES.
-                  </p>
-                </div>
-                <button
-                  onClick={chargerDevice}
-                  className="p-2 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition"
-                  title="Actualiser les métriques"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-              </div>
+                      <option value="">— aucune —</option>
+                      {machinesLibres.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.code} — {m.nom}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="font-mono text-sm">{device.machine_code ?? "aucune"}</span>
+                  )}
+                  <span className="text-xs text-slate-500">
+                    Convention : un device nommé comme le code machine est rattaché automatiquement.
+                  </span>
+                </section>
 
-              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                    <tr>
-                      <th className="py-2.5 px-4 font-semibold">Tag Automate (MQTT)</th>
-                      <th className="py-2.5 px-4 font-semibold">KPI MES Cible</th>
-                      <th className="py-2.5 px-4 font-semibold">Transformation</th>
-                      <th className="py-2.5 px-4 font-semibold">Paramètre</th>
-                      <th className="py-2.5 px-4 font-semibold text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {device?.mappings && device.mappings.length > 0 ? (
-                      device.mappings.map((m) => {
-                        const isEditing = editingMapping?.id === m.id
-                        return (
-                          <tr key={m.id} className="hover:bg-slate-50/70 transition">
-                            <td className="py-3 px-4 font-mono font-medium text-slate-900">
-                              {m.tag_name}
-                            </td>
-                            <td className="py-3 px-4">
-                              {isEditing ? (
+                <section>
+                  <h3 className="mb-2 text-sm font-semibold">Dernières valeurs reçues</h3>
+                  <div className="grid grid-cols-1 gap-1 rounded-xl border border-slate-200/80 p-3 text-xs sm:grid-cols-2 dark:border-zinc-800">
+                    {Object.entries(device.last_values ?? {})
+                      .filter(([nom]) => !nom.startsWith("Command/Action") && !nom.startsWith("Command/Id"))
+                      .map(([nom, valeur]) => (
+                        <div key={nom} className="flex justify-between gap-3 border-b border-slate-50 py-1 dark:border-zinc-900">
+                          <span className="font-mono text-slate-600 dark:text-zinc-400">{nom}</span>
+                          <span className="font-mono font-semibold">{formatValeur(valeur)}</span>
+                        </div>
+                      ))}
+                    {!device.last_values && <p className="text-slate-500">Aucune donnée reçue.</p>}
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="mb-1 text-sm font-semibold">Règles tag → KPI MES</h3>
+                  <p className="mb-2 text-xs text-slate-500">
+                    Les compteurs sont des totaux : le MES compte la différence depuis la dernière valeur reçue.
+                  </p>
+                  <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-zinc-800">
+                    <table className="w-full text-left text-xs">
+                      <thead className="border-b border-slate-200 bg-slate-50 text-slate-600 dark:border-zinc-800 dark:bg-zinc-900">
+                        <tr>
+                          <th className="px-3 py-2 font-semibold">Tag automate</th>
+                          <th className="px-3 py-2 font-semibold">KPI MES</th>
+                          <th className="px-3 py-2 font-semibold">Transformation</th>
+                          <th className="px-3 py-2 font-semibold">Paramètre</th>
+                          <th className="px-3 py-2 font-semibold">Active</th>
+                          {isAdmin && <th className="px-3 py-2 text-right font-semibold">Actions</th>}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-zinc-900">
+                        {device.mappings.map((m) =>
+                          editing?.id === m.id ? (
+                            <tr key={m.id} className="bg-orange-50/40">
+                              <td className="px-3 py-2 font-mono">{m.tag_name}</td>
+                              <td className="px-3 py-2">
                                 <select
-                                  value={editingMapping.target_kpi ?? m.target_kpi}
-                                  onChange={(e) =>
-                                    setEditingMapping({
-                                      ...editingMapping,
-                                      target_kpi: e.target.value as TargetKpi,
-                                    })
-                                  }
-                                  className="w-full p-1 border rounded text-xs bg-white"
+                                  value={editing.target_kpi}
+                                  onChange={(e) => setEditing({ ...editing, target_kpi: e.target.value as TargetKpi })}
+                                  className="w-full rounded border bg-white p-1"
                                 >
-                                  {TARGET_KPI_OPTIONS.map((kpi) => (
-                                    <option key={kpi.value} value={kpi.value}>
-                                      {kpi.label}
+                                  {TARGET_KPI_OPTIONS.map((o) => (
+                                    <option key={o.value} value={o.value}>
+                                      {o.label}
                                     </option>
                                   ))}
                                 </select>
-                              ) : (
-                                <span className="inline-flex px-2 py-0.5 rounded-md bg-slate-100 font-medium text-slate-800">
-                                  {TARGET_KPI_OPTIONS.find((k) => k.value === m.target_kpi)
-                                    ?.label ?? m.target_kpi}
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3 px-4">
-                              {isEditing ? (
+                              </td>
+                              <td className="px-3 py-2">
                                 <select
-                                  value={editingMapping.transformation ?? m.transformation}
+                                  value={editing.transformation}
                                   onChange={(e) =>
-                                    setEditingMapping({
-                                      ...editingMapping,
-                                      transformation: e.target.value as TagTransformation,
-                                    })
+                                    setEditing({ ...editing, transformation: e.target.value as TagTransformation })
                                   }
-                                  className="w-full p-1 border rounded text-xs bg-white"
+                                  className="w-full rounded border bg-white p-1"
                                 >
-                                  {TRANSFORMATION_OPTIONS.map((t) => (
-                                    <option key={t.value} value={t.value}>
-                                      {t.label}
+                                  {TRANSFORMATION_OPTIONS.map((o) => (
+                                    <option key={o.value} value={o.value}>
+                                      {o.label}
                                     </option>
                                   ))}
                                 </select>
-                              ) : (
-                                <span className="text-slate-600 font-mono text-[11px]">
-                                  {m.transformation}
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3 px-4 font-mono text-slate-500">
-                              {isEditing ? (
+                              </td>
+                              <td className="px-3 py-2">
                                 <input
-                                  type="text"
-                                  value={editingMapping.formula_param ?? ""}
-                                  onChange={(e) =>
-                                    setEditingMapping({
-                                      ...editingMapping,
-                                      formula_param: e.target.value,
-                                    })
-                                  }
-                                  placeholder="ex: 1.0"
-                                  className="w-20 p-1 border rounded text-xs"
+                                  value={editing.formula_param ?? ""}
+                                  onChange={(e) => setEditing({ ...editing, formula_param: e.target.value || null })}
+                                  placeholder="ex. 1.0"
+                                  className="w-20 rounded border p-1"
                                 />
-                              ) : (
-                                m.formula_param || "—"
-                              )}
-                            </td>
-                            <td className="py-3 px-4 text-right">
-                              {isEditing ? (
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <button
-                                    onClick={() => handleSaveMapping(editingMapping as SparkplugTagMapping)}
-                                    className="p-1 rounded bg-emerald-600 text-white hover:bg-emerald-700"
-                                  >
-                                    <Save className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => setEditingMapping(null)}
-                                    className="p-1 rounded bg-slate-200 text-slate-700 hover:bg-slate-300"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              ) : (
+                              </td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="checkbox"
+                                  checked={editing.actif}
+                                  onChange={(e) => setEditing({ ...editing, actif: e.target.checked })}
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-right">
                                 <button
-                                  onClick={() => setEditingMapping(m)}
-                                  className="text-orange-600 hover:text-orange-800 font-semibold"
+                                  onClick={() =>
+                                    void run(
+                                      () =>
+                                        sparkplugApi.updateMapping(device.id, {
+                                          tag_name: editing.tag_name,
+                                          target_kpi: editing.target_kpi,
+                                          transformation: editing.transformation,
+                                          formula_param: editing.formula_param,
+                                          description: editing.description,
+                                          actif: editing.actif,
+                                        }),
+                                      `Règle « ${editing.tag_name} » enregistrée.`,
+                                    )
+                                  }
+                                  className="mr-1 rounded bg-emerald-600 p-1 text-white hover:bg-emerald-700"
+                                  aria-label="Enregistrer"
                                 >
-                                  Modifier
+                                  <Save className="size-3.5" />
                                 </button>
+                                <button
+                                  onClick={() => setEditing(null)}
+                                  className="rounded bg-slate-200 p-1 text-slate-700 hover:bg-slate-300"
+                                  aria-label="Annuler"
+                                >
+                                  <X className="size-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ) : (
+                            <tr key={m.id} className={cn(!m.actif && "opacity-50")}>
+                              <td className="px-3 py-2 font-mono font-medium">{m.tag_name}</td>
+                              <td className="px-3 py-2">
+                                {TARGET_KPI_OPTIONS.find((o) => o.value === m.target_kpi)?.label ?? m.target_kpi}
+                              </td>
+                              <td className="px-3 py-2 font-mono text-xs text-slate-600">{m.transformation}</td>
+                              <td className="px-3 py-2 font-mono text-slate-500">{m.formula_param || "—"}</td>
+                              <td className="px-3 py-2">{m.actif ? "oui" : "non"}</td>
+                              {isAdmin && (
+                                <td className="px-3 py-2 text-right">
+                                  <button
+                                    onClick={() => setEditing(m)}
+                                    className="mr-2 font-semibold text-orange-600 hover:text-orange-800"
+                                  >
+                                    Modifier
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      void run(
+                                        () => sparkplugApi.deleteMapping(device.id, m.id),
+                                        `Règle « ${m.tag_name} » supprimée.`,
+                                      )
+                                    }
+                                    className="text-slate-400 hover:text-rose-600"
+                                    aria-label={`Supprimer la règle ${m.tag_name}`}
+                                  >
+                                    <Trash2 className="inline size-3.5" />
+                                  </button>
+                                </td>
                               )}
+                            </tr>
+                          ),
+                        )}
+                        {device.mappings.length === 0 && (
+                          <tr>
+                            <td colSpan={isAdmin ? 6 : 5} className="py-6 text-center text-slate-400">
+                              Aucune règle : le device n'alimente aucun KPI.
                             </td>
                           </tr>
-                        )
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={5} className="py-6 text-center text-slate-400">
-                          Aucun mapping configuré. Envoyez une trame DBIRTH pour découvrir les tags.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            Broker Sparkplug B: In-Memory / MQTT Port 1883
+        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-6 py-4 text-xs text-slate-500 dark:border-zinc-800 dark:bg-zinc-900/40">
+          <span>
+            {status ? `${status.edge_nodes} edge node(s) · ${status.commandes_en_attente} commande(s) en attente d'accusé` : ""}
           </span>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 font-semibold transition"
-          >
-            Fermer
-          </button>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <button
+                onClick={() =>
+                  void run(
+                    async () => {
+                      const r = await sparkplugApi.rebirth()
+                      return r
+                    },
+                    "Re-naissance demandée à tous les edge nodes.",
+                  )
+                }
+                disabled={!status?.connected}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                title="NCMD « Node Control/Rebirth » : chaque automate republie son état complet"
+              >
+                Resynchroniser
+              </button>
+            )}
+            <button
+              onClick={() => void load()}
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              <RefreshCw className={cn("size-3.5", loading && "animate-spin")} /> Actualiser
+            </button>
+            <button
+              onClick={onClose}
+              className="rounded-xl bg-slate-900 px-4 py-2 font-semibold text-white transition hover:bg-slate-800"
+            >
+              Fermer
+            </button>
+          </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function Info({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-zinc-900">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className={cn("truncate font-semibold", mono && "font-mono")}>{value}</p>
     </div>
   )
 }

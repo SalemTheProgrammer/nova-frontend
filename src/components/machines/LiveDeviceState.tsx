@@ -50,24 +50,36 @@ export function LiveDeviceState({ machine }: { machine: Machine | null }) {
     <Card className="p-6">
       <div className="flex flex-col items-center gap-5 sm:flex-row sm:justify-center sm:gap-10">
         <div
-          className={`flex flex-col items-center gap-2 rounded-2xl border-2 px-6 py-5 ${info.classes}`}
+          className={`flex flex-col items-center gap-2 rounded-xl border-2 px-6 py-5 ${info.classes}`}
         >
           <Icon className="size-12" />
           <p className="text-xl font-semibold">{info.label}</p>
           <p className="text-sm opacity-80">{machine.nom}</p>
+          <p className="text-xs opacity-70">
+            {machine.automate_connecte == null
+              ? "Aucun automate rattaché"
+              : machine.automate_connecte
+                ? "Automate connecté"
+                : "Automate hors ligne — état figé"}
+          </p>
+          <p className="text-sm font-medium">
+            {machine.operateur
+              ? `Au poste : ${machine.operateur.nom ?? machine.operateur.matricule}`
+              : "Aucun opérateur au poste"}
+          </p>
         </div>
 
         {machine.trs != null && <Gauge value={Number(machine.trs)} label="Performance" size={140} />}
 
         <div className="grid grid-cols-2 gap-4 text-center">
           <div>
-            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+            <p className="text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
               {machine.quantite_bonne}
             </p>
             <p className="text-xs text-muted-foreground">Unités bonnes</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-destructive">{machine.quantite_rejetee}</p>
+            <p className="text-2xl font-semibold text-destructive">{machine.quantite_rejetee}</p>
             <p className="text-xs text-muted-foreground">Unités rejetées</p>
           </div>
         </div>

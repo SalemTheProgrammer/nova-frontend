@@ -39,6 +39,9 @@ export function useAgentChat(
   const [turns, setTurns] = useState<AgentTurn[]>([])
   const [loading, setLoading] = useState(false)
   const threadId = useRef<string | undefined>(chatSession.threadId)
+  // true une fois l'historique éventuel rechargé : avant, une conversation vide
+  // ne veut pas encore dire « nouvelle conversation ».
+  const [pret, setPret] = useState(() => !chatSession.threadId)
 
   // Réhydrate la conversation après un refresh de page : le thread_id
   // survit dans localStorage, l'historique des messages survit côté backend
@@ -53,6 +56,9 @@ export function useAgentChat(
       })
       .catch(() => {
         // Thread introuvable/expiré : on repart d'une conversation vide.
+      })
+      .finally(() => {
+        if (!cancelled) setPret(true)
       })
     return () => {
       cancelled = true
@@ -158,5 +164,14 @@ export function useAgentChat(
     }
   }, [])
 
-  return { turns, loading, send, clear }
+  /** Le message d'accueil a ouvert ce thread côté backend : les prochains
+   * messages de l'opérateur doivent y partir. */
+  const adopterThread = useCallback((id: string) => {
+    threadId.current = id
+    chatSession.setThreadId(id)
+  }, [])
+
+  const threadActuel = useCallback(() => threadId.current, [])
+
+  return { turns, loading, send, clear, pret, adopterThread, threadActuel }
 }

@@ -1,41 +1,19 @@
-import { useEffect, useMemo, useState } from "react"
-import { CheckCircle2, FlaskConical, Radio, RotateCcw } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { Check, ChevronDown, Factory, FileText, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
 import { useDashboardData } from "@/hooks/useDashboardData"
-import { lignesApi, simulatorApi } from "@/lib/api"
+import { kpiApi, lignesApi } from "@/lib/api"
 import type { LigneProduction } from "@/lib/types"
-import { SegmentedBlockGauge } from "@/components/dashboard/SegmentedBlockGauge"
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton"
 import { ErrorBanner } from "@/components/dashboard/primitives"
-import { SparkplugStudioModal } from "@/components/dashboard/SparkplugStudioModal"
-import { PrelevementModal } from "@/components/dashboard/PrelevementModal"
+import { AnalogGaugesRow } from "@/components/dashboard/AnalogGauge"
+import { TrsEvolutionChart } from "@/components/dashboard/TrsEvolutionChart"
+import { ArretsDistributionCard } from "@/components/dashboard/ArretsDistributionCard"
 
+const nombre = (v: number, decimales = 0) =>
+  v.toLocaleString("fr-FR", { maximumFractionDigits: decimales })
 
-
-function CadenceTooltip({ active, payload, label }: any) {
-  if (!active || !payload || !payload.length) return null
-  return (
-    <div className="rounded-xl border border-slate-200/90 bg-white/95 px-3.5 py-2.5 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.1)] backdrop-blur-md text-xs dark:border-zinc-800 dark:bg-zinc-900/95">
-      <div className="font-semibold text-slate-400 text-[10.5px] uppercase tracking-wider">{label}</div>
-      <div className="mt-1 flex items-center gap-2 font-bold text-sky-600 dark:text-sky-400 text-sm font-sans">
-        <span>{payload[0]?.value} unités / min</span>
-      </div>
-      <div className="text-[10.5px] text-slate-500 mt-0.5 font-medium">Objectif nominal : 120 u/min</div>
-    </div>
-  )
-}
-
-/** Dashboard MES : Cockpit Haute Performance 100vh Épuré & Convaincant */
+/** Tableau de bord MES : uniquement des valeurs mesurées, aucune donnée de repli. */
 export function MesDashboardPage({
   ligneId,
   onChangeLigne,
@@ -43,500 +21,310 @@ export function MesDashboardPage({
   ligneId: number | null
   onChangeLigne?: (id: number | null) => void
 }) {
-  const { resume, machines, loading, error, refresh } = useDashboardData(ligneId)
+  const { resume, loading, error } = useDashboardData(ligneId)
   const [lignes, setLignes] = useState<LigneProduction[]>([])
-  const [sparkplugOpen, setSparkplugOpen] = useState(false)
-  const [prelevementOpen, setPrelevementOpen] = useState(false)
-  const [isResetting, setIsResetting] = useState(false)
 
   useEffect(() => {
+    document.title = "Supervision — Nova"
     lignesApi.list().then(setLignes).catch(() => {})
   }, [])
 
-  async function handleReset() {
-    if (!window.confirm("Voulez-vous vraiment réinitialiser toutes les métriques de production et compteurs à zéro ?")) {
-      return
+  const ofActif = resume?.of_actif ?? null
+
+  const bonnes = Number(resume?.quantite_bonne ?? 0)
+  const rejets = Number(resume?.quantite_rejetee ?? 0)
+  const cible = Number(resume?.production_cible ?? 0)
+  const reste = Number(resume?.reste_a_produire ?? 0)
+  const avancement = cible > 0 ? Math.min(100, Math.round(((bonnes + rejets) / cible) * 100)) : null
+  const tauxRejet = bonnes + rejets > 0 ? (rejets / (bonnes + rejets)) * 100 : 0
+  const cadence = Number(resume?.cadence_actuelle_par_min ?? 0)
+  const cadenceNominale = Number(resume?.cadence_nominale_par_min ?? 0)
+
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  const [downloadingBilan, setDownloadingBilan] = useState(false)
+  const [bilanSuccess, setBilanSuccess] = useState(false)
+  const [bilanError, setBilanError] = useState<string | null>(null)
+
+  const selectedLigne = useMemo(() => lignes.find((l) => l.id === ligneId), [lignes, ligneId])
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false)
+      }
     }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsDropdownOpen(false)
+      }
+    }
+    if (isDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside)
+      document.addEventListener("keydown", handleKeyDown)
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside)
+        document.removeEventListener("keydown", handleKeyDown)
+      }
+    }
+  }, [isDropdownOpen])
+
+  const handleDownloadBilan = async () => {
     try {
-      setIsResetting(true)
-      await simulatorApi.reset()
-      await refresh()
-    } catch (e) {
-      console.error("Erreur lors de la réinitialisation de l'atelier", e)
+      setDownloadingBilan(true)
+      setBilanError(null)
+      await kpiApi.downloadBilanPdf(ligneId, ofActif?.id ?? null)
+      setBilanSuccess(true)
+      setTimeout(() => setBilanSuccess(false), 2500)
+    } catch (err) {
+      setBilanError(err instanceof Error ? err.message : "Erreur lors de la génération du bilan PDF")
+      setTimeout(() => setBilanError(null), 6000)
     } finally {
-      setIsResetting(false)
+      setDownloadingBilan(false)
     }
   }
 
-  const nbEnMarche = machines.filter((m) => m.statut === "MARCHE").length
-  const totalMachines = machines.length
-
-  // Cadence instantanée totale de la ligne
-  const cadenceTotale = machines
-    .filter((m) => m.statut === "MARCHE")
-    .reduce((acc, m) => {
-      const cycle = Number(m.temps_cycle_actuel_s || m.temps_cycle_cible_s || 0)
-      return acc + (cycle > 0 ? Math.round(60 / cycle) : 0)
-    }, 0)
-
-  const cadenceNominale = machines
-    .reduce((acc, m) => {
-      const cycle = Number(m.temps_cycle_cible_s || 0)
-      return acc + (cycle > 0 ? Math.round(60 / cycle) : 0)
-    }, 0) || 120
-  const ratioCadence = cadenceNominale > 0 ? Math.min(100, Math.round((cadenceTotale / cadenceNominale) * 100)) : 0
-
-  // Rendement global calculé ou moyenne des machines actives
-  const machinesAvecTrs = machines.filter((m) => m.trs != null && Number(m.trs) > 0)
-  const moyenneMachineTrs = machinesAvecTrs.length > 0
-    ? Math.round((machinesAvecTrs.reduce((sum, m) => sum + Number(m.trs), 0) / machinesAvecTrs.length) * 100)
-    : 0
-
-  const parsedTrs = Number(resume?.trs_global ?? 0)
-  const trsPercentage = Math.round(
-    parsedTrs > 0 && parsedTrs <= 1
-      ? parsedTrs * 100
-      : parsedTrs > 1
-        ? parsedTrs
-        : moyenneMachineTrs
-  )
-
-  // Machines réelles pour l'affichage (affiche toutes les machines de la ligne)
-  const machinesAffichees = machines.length > 0
-    ? machines.map((m) => ({
-        code: m.code,
-        nom: m.nom,
-        statut: m.statut === "MARCHE" ? "En marche" : (m.statut === "PANNE" ? "En panne" : "À l'arrêt"),
-        cadence: m.statut === "MARCHE" && (m.temps_cycle_actuel_s || m.temps_cycle_cible_s)
-          ? `${Math.round(60 / Number(m.temps_cycle_actuel_s || m.temps_cycle_cible_s))} cpm`
-          : "0 cpm",
-        rendement: m.trs != null && Number(m.trs) > 0 ? `${Math.round(Number(m.trs) * 100)}%` : "0%",
-        enMarche: m.statut === "MARCHE",
-        enPanne: m.statut === "PANNE",
-      }))
-    : [
-        { code: "Poste 1", nom: "Comprimeuse Rotative", statut: "À l'arrêt", cadence: "0 cpm", rendement: "0%", enMarche: false, enPanne: false },
-        { code: "Poste 2", nom: "Ligne Blistrière", statut: "À l'arrêt", cadence: "0 cpm", rendement: "0%", enMarche: false, enPanne: false },
-        { code: "Poste 3", nom: "Compteuse & Remplisseuse", statut: "À l'arrêt", cadence: "0 cpm", rendement: "0%", enMarche: false, enPanne: false },
-      ]
-
-  // Statistiques de production réelles avec synchronisation live sur les machines
-  const rawCible = Number(resume?.production_cible ?? 0)
-  const rawBonne = Number(resume?.quantite_bonne ?? 0)
-  const rawRejet = Number(resume?.quantite_rejetee ?? 0)
-
-  const machinesBonne = machines.reduce((acc, m) => acc + (m.quantite_bonne || 0), 0)
-  const machinesRejet = machines.reduce((acc, m) => acc + (m.quantite_rejetee || 0), 0)
-
-  const prodCible = rawCible > 0 ? rawCible : 1000
-  const prodBonne = rawBonne > 0 ? rawBonne : machinesBonne
-  const prodRejet = rawRejet > 0 ? rawRejet : machinesRejet
-  const prodTotale = prodBonne + prodRejet
-  const avancementPct = prodCible > 0 ? Math.min(100, Math.round((prodTotale / prodCible) * 100)) : 0
-  const tauxConformite = prodTotale > 0 ? ((prodBonne / prodTotale) * 100).toFixed(1) : (nbEnMarche > 0 ? "100.0" : "0.0")
-  const tauxRejet = prodTotale > 0 ? ((prodRejet / prodTotale) * 100).toFixed(1) : "0.0"
-  const dispoPct = resume?.disponibilite != null && Number(resume.disponibilite) > 0
-    ? Math.round(Number(resume.disponibilite) * 100)
-    : (nbEnMarche > 0 ? 100 : 0)
-
-  const chartCadenceData = useMemo(() => {
-    if (cadenceTotale === 0) {
-      return [
-        { heure: "10:00", cadence: 0, cible: cadenceNominale },
-        { heure: "11:00", cadence: 0, cible: cadenceNominale },
-        { heure: "12:00", cadence: 0, cible: cadenceNominale },
-        { heure: "13:00", cadence: 0, cible: cadenceNominale },
-        { heure: "14:00", cadence: 0, cible: cadenceNominale },
-        { heure: "15:00", cadence: 0, cible: cadenceNominale },
-      ]
-    }
-    return [
-      { heure: "10:00", cadence: Math.round(cadenceTotale * 0.88), cible: cadenceNominale },
-      { heure: "11:00", cadence: Math.round(cadenceTotale * 0.95), cible: cadenceNominale },
-      { heure: "12:00", cadence: Math.round(cadenceTotale * 0.92), cible: cadenceNominale },
-      { heure: "13:00", cadence: Math.round(cadenceTotale * 0.98), cible: cadenceNominale },
-      { heure: "14:00", cadence: Math.round(cadenceTotale * 0.96), cible: cadenceNominale },
-      { heure: "15:00", cadence: cadenceTotale, cible: cadenceNominale },
-    ]
-  }, [cadenceTotale, cadenceNominale])
-
-
-  const ofActif = resume?.of_actif
-  const nomLigneActive = lignes.find((l) => l.id === ligneId)?.designation
-
   return (
-    <div className="flex flex-col h-full w-full overflow-hidden p-3 sm:p-4 md:p-5 gap-3 bg-slate-50/70 dark:bg-zinc-950 font-sans select-none">
-      {/* 1. Barre Supérieure : Titre Épuré, Sélecteur de Ligne & Statut Temps Réel */}
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200/80 pb-3 dark:border-zinc-800">
-        <div className="flex items-center gap-3">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                Supervision d'Atelier
-              </h1>
+    // Écran de supervision 100vh sans défilement inutile
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto lg:overflow-hidden">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1600px] flex-col gap-2.5 p-3 sm:p-4">
+        <header className="flex shrink-0 items-center justify-between gap-2.5 border-b border-border/60 pb-3 pt-0.5 min-w-0">
+          {/* Ligne & Ordre de fabrication actif */}
+          <div className="flex min-w-0 items-center gap-2.5 shrink">
+            {/* Sélecteur de ligne haute précision */}
+            <div className="relative shrink-0" ref={dropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsDropdownOpen((prev) => !prev)}
+                aria-expanded={isDropdownOpen}
+                aria-haspopup="listbox"
+                aria-label="Ligne de production"
+                className={cn(
+                  "group inline-flex h-10 items-center gap-2 rounded-xl border border-border/80 bg-card/90 px-3.5 text-sm font-medium shadow-2xs transition-all",
+                  "hover:bg-accent/70 hover:border-border active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-ring/30",
+                  isDropdownOpen && "border-ring ring-2 ring-ring/20 bg-accent/60"
+                )}
+              >
+                <Factory className="size-4 text-muted-foreground transition-colors group-hover:text-foreground shrink-0" />
+                {selectedLigne ? (
+                  <span className="flex items-center gap-1.5 min-w-0 truncate">
+                    <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 shrink-0">
+                      {selectedLigne.code}
+                    </span>
+                    <span className="truncate max-w-[100px] sm:max-w-[140px] md:max-w-[180px] text-foreground font-medium">
+                      {selectedLigne.designation}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-foreground font-medium whitespace-nowrap">Toutes les lignes</span>
+                )}
+                <ChevronDown
+                  className={cn(
+                    "size-4 text-muted-foreground transition-transform duration-200 ml-0.5 shrink-0",
+                    isDropdownOpen && "rotate-180 text-foreground"
+                  )}
+                />
+              </button>
 
-              {/* Sélecteur de Ligne intégré directement dans le Dashboard */}
-              <div className="relative inline-flex items-center">
-                <select
-                  value={ligneId ?? ""}
-                  onChange={(e) => onChangeLigne?.(e.target.value ? Number(e.target.value) : null)}
-                  className="rounded-lg border border-slate-200 bg-white/95 px-2.5 py-1 text-xs font-bold text-slate-700 shadow-xs focus:outline-hidden dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 cursor-pointer hover:border-slate-300 transition"
+              {isDropdownOpen && (
+                <div
+                  role="listbox"
+                  className="absolute left-0 top-full mt-1.5 z-50 min-w-[260px] sm:min-w-[290px] rounded-xl border border-border/80 bg-popover/95 p-1.5 shadow-xl backdrop-blur-md animate-in fade-in-0 zoom-in-95 duration-150"
                 >
-                  <option value="">🏢 Toutes les lignes (Usine)</option>
-                  {lignes.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      🏭 {l.code} — {l.designation}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                    Ligne de production
+                  </div>
 
-              <span className={cn(
-                "hidden sm:inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold shadow-xs",
-                nbEnMarche > 0
-                  ? "bg-emerald-50 border border-emerald-500/25 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
-                  : "bg-slate-100 border border-slate-300/50 text-slate-600 dark:bg-zinc-800/60 dark:text-zinc-400"
-              )}>
-                <span className={cn(
-                  "size-2 rounded-full",
-                  nbEnMarche > 0
-                    ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]"
-                    : "bg-slate-400"
-                )} />
-                {nbEnMarche > 0 ? "Ligne en Production" : "Ligne à l'arrêt"}
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={ligneId === null}
+                    onClick={() => {
+                      onChangeLigne?.(null)
+                      setIsDropdownOpen(false)
+                    }}
+                    className={cn(
+                      "flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors",
+                      ligneId === null
+                        ? "bg-accent text-accent-foreground font-medium"
+                        : "hover:bg-muted/70 text-foreground"
+                    )}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="size-2 rounded-full bg-emerald-500/80" />
+                      <span>Toutes les lignes</span>
+                    </span>
+                    {ligneId === null && <Check className="size-4 text-primary shrink-0" />}
+                  </button>
+
+                  {lignes.length > 0 && <div className="my-1 h-px bg-border/60" />}
+
+                  <div className="max-h-64 overflow-y-auto space-y-0.5">
+                    {lignes.map((l) => {
+                      const isSelected = l.id === ligneId
+                      return (
+                        <button
+                          key={l.id}
+                          type="button"
+                          role="option"
+                          aria-selected={isSelected}
+                          onClick={() => {
+                            onChangeLigne?.(l.id)
+                            setIsDropdownOpen(false)
+                          }}
+                          className={cn(
+                            "flex w-full items-center justify-between gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors",
+                            isSelected
+                              ? "bg-accent text-accent-foreground font-medium"
+                              : "hover:bg-muted/70 text-foreground"
+                          )}
+                        >
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="shrink-0 font-mono text-[11px] font-semibold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                              {l.code}
+                            </span>
+                            <span className="truncate text-sm">{l.designation}</span>
+                          </div>
+                          {isSelected && <Check className="size-4 text-primary shrink-0" />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* OF & Article */}
+            {ofActif ? (
+              <div className="flex items-center gap-2 min-w-0 shrink">
+                <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-lg border border-primary/25 shrink-0">
+                  {ofActif.numero}
+                </span>
+                <span
+                  className="text-xs sm:text-sm font-medium text-foreground truncate max-w-[130px] md:max-w-[200px] lg:max-w-[280px] xl:max-w-[400px]"
+                  title={ofActif.article_designation}
+                >
+                  {ofActif.article_designation}
+                </span>
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground font-normal whitespace-nowrap">
+                Aucun ordre de fabrication en cours
+              </span>
+            )}
+          </div>
+
+          {/* Indicateurs de flux & production compacts alignés sur une seule ligne */}
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 whitespace-nowrap">
+            {/* Pièces bonnes */}
+            <div
+              className="flex h-10 items-center gap-1.5 sm:gap-2 rounded-xl border border-border/80 bg-card/90 px-3 sm:px-3.5 text-xs shadow-2xs shrink-0"
+              title={ofActif && reste > 0 ? `Reste à produire : ${nombre(reste)}` : undefined}
+            >
+              <span className="text-muted-foreground text-xs font-medium">Bonnes :</span>
+              <span className="font-bold text-foreground tabular-nums text-sm">
+                {nombre(bonnes)}
+              </span>
+              {cible > 0 && (
+                <span className="text-muted-foreground font-mono text-xs">/ {nombre(cible)}</span>
+              )}
+              {avancement != null && (
+                <span className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10.5px] font-bold text-emerald-600 dark:text-emerald-400">
+                  {avancement}%
+                </span>
+              )}
+            </div>
+
+            {/* Cadence */}
+            <div className="flex h-10 items-center gap-1.5 sm:gap-2 rounded-xl border border-border/80 bg-card/90 px-3 sm:px-3.5 text-xs shadow-2xs shrink-0">
+              <span className="text-muted-foreground text-xs font-medium">Cadence :</span>
+              <span className="font-bold text-foreground tabular-nums text-sm">
+                {nombre(cadence, 1)}
+              </span>
+              <span className="text-muted-foreground text-xs">u/min</span>
+              {cadenceNominale > 0 && (
+                <span className="text-muted-foreground font-mono text-[10.5px]">
+                  ({Math.round((cadence / cadenceNominale) * 100)}%)
+                </span>
+              )}
+            </div>
+
+            {/* Rejets */}
+            <div className="flex h-10 items-center gap-1.5 sm:gap-2 rounded-xl border border-border/80 bg-card/90 px-3 sm:px-3.5 text-xs shadow-2xs shrink-0">
+              <span className="text-muted-foreground text-xs font-medium">Rejets :</span>
+              <span className="font-bold text-foreground tabular-nums text-sm">
+                {nombre(rejets)}
+              </span>
+              <span className="rounded-md bg-rose-500/10 px-1.5 py-0.5 font-mono text-[10.5px] font-semibold text-rose-600 dark:text-rose-400">
+                {nombre(tauxRejet, 1)}%
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5 font-medium">
-              {ofActif
-                ? `Ordre ${ofActif.numero} — ${ofActif.article_designation} ${nomLigneActive ? `(${nomLigneActive})` : ""}`
-                : nomLigneActive
-                  ? `${nomLigneActive} • Paracétamol 500 mg — Comprimés`
-                  : "Vue Globale Usine • Ensemble des lignes actives"}
-            </p>
+
+            {/* Bouton Bilan OF */}
+            <button
+              type="button"
+              onClick={handleDownloadBilan}
+              disabled={downloadingBilan}
+              title={
+                ofActif
+                  ? `Générer le Bilan Ordre de Fabrication officiel pour ${ofActif.numero}`
+                  : "Générer le Bilan Ordre de Fabrication officiel (PDF)"
+              }
+              className={cn(
+                "group inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border/80 bg-card/90 px-3.5 text-sm font-medium shadow-2xs transition-all",
+                "hover:bg-accent/70 hover:border-border active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-ring/30",
+                "disabled:pointer-events-none disabled:opacity-50",
+                bilanSuccess && "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              )}
+            >
+              {downloadingBilan ? (
+                <>
+                  <Loader2 className="size-4 animate-spin text-primary shrink-0" />
+                  <span>Génération...</span>
+                </>
+              ) : bilanSuccess ? (
+                <>
+                  <Check className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span>Téléchargé</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="size-4 text-muted-foreground transition-colors group-hover:text-foreground shrink-0" />
+                  <span>Bilan OF</span>
+                </>
+              )}
+            </button>
           </div>
-        </div>
+        </header>
 
-        {/* Boutons d'action : Reset, Sparkplug B IoT & Prélèvements MP BPF */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleReset}
-            disabled={isResetting}
-            className="inline-flex items-center gap-1.5 rounded-full border border-red-200/90 bg-red-50/80 hover:bg-red-100/90 px-3 py-1 text-xs font-bold text-red-700 shadow-xs transition dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300 disabled:opacity-50 cursor-pointer"
-            title="Remettre tous les compteurs, arrêts et événements de l'atelier à 0"
-          >
-            <RotateCcw className={`w-3.5 h-3.5 text-red-600 dark:text-red-400 ${isResetting ? "animate-spin" : ""}`} />
-            <span>{isResetting ? "Reset…" : "Remise à zéro"}</span>
-          </button>
+        <ErrorBanner message={bilanError ?? error} />
 
-          <button
-            onClick={() => setPrelevementOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-blue-200/80 bg-blue-50/70 hover:bg-blue-100/80 px-3 py-1 text-xs font-bold text-blue-800 shadow-[0_2px_8px_-2px_rgba(37,99,235,0.1)] transition dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300"
-            title="Prélèvements Matières Premières & Libération CQ (BPF)"
-          >
-            <FlaskConical className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            <span>Prélèvements MP</span>
-          </button>
+        {loading && !resume ? (
+          <DashboardSkeleton />
+        ) : (
+          <>
+            {/* 1. 5 Jauges Analogiques Alignées (TRS, Disponibilité, Performance, TRG, TRE) */}
+            <section className="shrink-0">
+              <AnalogGaugesRow resume={resume} />
+            </section>
 
-          <button
-            onClick={() => setSparkplugOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-orange-200/80 bg-orange-50/70 hover:bg-orange-100/80 px-3 py-1 text-xs font-bold text-orange-800 shadow-[0_2px_8px_-2px_rgba(234,88,12,0.1)] transition dark:border-orange-900/50 dark:bg-orange-950/40 dark:text-orange-300"
-            title="Studio MQTT Sparkplug B & Simulation RFID"
-          >
-            <Radio className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
-            <span>Sparkplug B IoT</span>
-          </button>
+            {/* 3. Évolution TRS temps réel (devices) & Distribution des arrêts */}
+            <section className="min-h-0 flex-1 grid grid-cols-1 gap-2.5 lg:grid-cols-2 pb-1">
+              <TrsEvolutionChart
+                ligneId={ligneId}
+                trsGlobalActuel={resume?.trs_global}
+                disponibiliteActuelle={resume?.disponibilite}
+                performanceActuelle={resume?.performance}
+                qualiteActuelle={resume?.qualite}
+                className="h-full min-h-0"
+              />
 
-          <div className="hidden sm:inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1 text-xs font-bold text-slate-600 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.05)] ring-1 ring-slate-900/5 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-            <span className="size-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
-            <span>Télémétrie Active</span>
-          </div>
-        </div>
+              <ArretsDistributionCard resume={resume} className="h-full min-h-0" />
+            </section>
+          </>
+        )}
       </div>
-
-      <ErrorBanner message={error} />
-
-      {loading && !resume ? (
-        <DashboardSkeleton />
-      ) : (
-        <div className="flex flex-col flex-1 min-h-0 gap-3 overflow-hidden">
-          {/* 2. Étage Haut (flex-[5]) : Les 3 Cartes Majeures avec Ombres Diffuses Luxueuses */}
-          <div className="flex-[5] min-h-0 grid grid-cols-1 md:grid-cols-12 gap-3">
-            {/* CARTE 1 (5 cols) : LE GRAND COMPTEUR À BLOCS SEGMENTÉS ORANGE */}
-            <div className="md:col-span-5 flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-[0_12px_36px_-6px_rgba(0,0,0,0.06),0_4px_12px_-2px_rgba(0,0,0,0.02)] ring-1 ring-slate-900/5 dark:border-zinc-800 dark:bg-zinc-900/90 dark:ring-white/5 overflow-hidden">
-              <div className="flex items-center justify-between shrink-0">
-                <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
-                    Rendement Global
-                  </span>
-                  <p className="text-sm font-extrabold text-slate-900 dark:text-zinc-100">
-                    Efficience Ligne
-                  </p>
-                </div>
-                <span className="rounded-lg bg-orange-50/80 border border-orange-200/80 dark:bg-orange-950/40 dark:border-orange-900/40 px-2.5 py-1 text-xs font-bold text-orange-700 dark:text-orange-400 shadow-xs">
-                  Objectif : 75%
-                </span>
-              </div>
-
-              {/* Jauge à blocs semi-circulaires personnalisée */}
-              <div className="flex-1 min-h-0 flex items-center justify-center py-2">
-                <SegmentedBlockGauge
-                  value={trsPercentage}
-                  label="Objectif Ligne"
-                  color="#ea580c"
-                  size={265}
-                />
-              </div>
-            </div>
-
-            {/* CARTE 2 (4 cols) : PRODUCTION & AVANCEMENT AVEC VALEURS AGRANDIES */}
-            <div className="md:col-span-4 flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-[0_12px_36px_-6px_rgba(0,0,0,0.06),0_4px_12px_-2px_rgba(0,0,0,0.02)] ring-1 ring-slate-900/5 dark:border-zinc-800 dark:bg-zinc-900/90 dark:ring-white/5 overflow-hidden">
-              <div className="flex items-center justify-between shrink-0">
-                <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
-                    Production du Jour
-                  </span>
-                  <p className="text-sm font-extrabold text-slate-900 dark:text-zinc-100">
-                    Volume & Conformité
-                  </p>
-                </div>
-                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                  <CheckCircle2 className="size-3.5" />
-                  {tauxConformite}% conformes
-                </span>
-              </div>
-
-              <div className="my-auto py-2">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-4xl sm:text-5xl font-black tracking-tight text-slate-900 dark:text-white">
-                    {prodBonne.toLocaleString("fr-FR")}
-                  </span>
-                  <span className="text-sm font-bold text-slate-400">
-                    / {prodCible.toLocaleString("fr-FR")} u
-                  </span>
-                </div>
-
-                {/* Barre de progression fluide avec ombre interne */}
-                <div className="mt-3">
-                  <div className="flex justify-between text-xs font-semibold mb-1 text-slate-600 dark:text-zinc-300">
-                    <span>Avancement de l'Ordre</span>
-                    <span className="font-extrabold text-slate-900 dark:text-white">{avancementPct}%</span>
-                  </div>
-                  <div className="h-2.5 w-full rounded-full bg-slate-100 dark:bg-zinc-800 overflow-hidden shadow-inner">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 transition-all duration-1000 shadow-[0_0_12px_rgba(14,165,233,0.4)]"
-                      style={{ width: `${avancementPct}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Sous-cartes agrandies avec ombre et bordure douce */}
-                <div className="mt-3.5 grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-slate-200/80 bg-gradient-to-b from-white to-slate-50/70 p-3.5 shadow-[0_4px_14px_-2px_rgba(0,0,0,0.04)] ring-1 ring-slate-900/5 dark:border-zinc-800 dark:from-zinc-900 dark:to-zinc-800/60">
-                    <span className="text-slate-500 dark:text-zinc-400 block text-xs font-bold">
-                      Pièces Bonnes
-                    </span>
-                    <span className="mt-1.5 block text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none font-sans">
-                      {prodBonne.toLocaleString("fr-FR")}
-                    </span>
-                  </div>
-                  <div className="rounded-xl border border-slate-200/80 bg-gradient-to-b from-white to-slate-50/70 p-3.5 shadow-[0_4px_14px_-2px_rgba(0,0,0,0.04)] ring-1 ring-slate-900/5 dark:border-zinc-800 dark:from-zinc-900 dark:to-zinc-800/60">
-                    <span className="text-slate-500 dark:text-zinc-400 block text-xs font-bold">
-                      Rejets ({tauxRejet}%)
-                    </span>
-                    <span className="mt-1.5 block text-2xl sm:text-3xl font-black text-amber-600 dark:text-amber-400 tracking-tight leading-none font-sans">
-                      {prodRejet}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* CARTE 3 (3 cols) : CADENCE & TEMPS EN MARCHES AVEC SOUS-PANNEAUX ÉLÉGANTS */}
-            <div className="md:col-span-3 flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-[0_12px_36px_-6px_rgba(0,0,0,0.06),0_4px_12px_-2px_rgba(0,0,0,0.02)] ring-1 ring-slate-900/5 dark:border-zinc-800 dark:bg-zinc-900/90 dark:ring-white/5 overflow-hidden">
-              <div className="flex items-center justify-between shrink-0">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
-                  Cadence & Temps
-                </span>
-                <span className={cn(
-                  "size-2 rounded-full",
-                  nbEnMarche > 0
-                    ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
-                    : "bg-slate-300 dark:bg-zinc-600"
-                )} />
-              </div>
-
-              <div className="my-auto py-2 space-y-3">
-                <div className="rounded-xl border border-slate-200/70 bg-gradient-to-b from-white to-slate-50/70 p-3.5 shadow-[0_4px_14px_-2px_rgba(0,0,0,0.04)] ring-1 ring-slate-900/5 dark:border-zinc-800 dark:from-zinc-900 dark:to-zinc-800/60">
-                  <span className="text-xs text-slate-500 dark:text-zinc-400 font-bold block">Cadence Instantanée</span>
-                  <div className="flex items-baseline gap-1.5 mt-1">
-                    <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                      {cadenceTotale}
-                    </span>
-                    <span className="text-xs font-bold text-slate-400">unités / min</span>
-                  </div>
-                  <span className={cn(
-                    "text-[11px] font-semibold block mt-0.5",
-                    ratioCadence > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-zinc-500"
-                  )}>
-                    {ratioCadence > 0 ? `${ratioCadence}% de la cadence nominale` : "Ligne inactive"}
-                  </span>
-                </div>
-
-                <div className="rounded-xl border border-slate-200/70 bg-gradient-to-b from-white to-slate-50/70 p-3.5 shadow-[0_4px_14px_-2px_rgba(0,0,0,0.04)] ring-1 ring-slate-900/5 dark:border-zinc-800 dark:from-zinc-900 dark:to-zinc-800/60">
-                  <span className="text-xs text-slate-500 dark:text-zinc-400 font-bold block">État Opérationnel</span>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-2xl font-black text-slate-900 dark:text-white">
-                      {nbEnMarche > 0 ? "En production" : "À l'arrêt"}
-                    </span>
-                    <span className="text-xs font-semibold text-slate-400">
-                      (Disponibilité {dispoPct}%)
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 3. Étage Bas (flex-[4.5]) : Suivi Graphique Lumineux & Postes de Travail */}
-          <div className="flex-[4.5] min-h-0 grid grid-cols-1 md:grid-cols-12 gap-3">
-            {/* GRAPHIQUE CADENCE (7 cols) */}
-            <div className="md:col-span-7 flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_12px_36px_-6px_rgba(0,0,0,0.06),0_4px_12px_-2px_rgba(0,0,0,0.02)] ring-1 ring-slate-900/5 dark:border-zinc-800 dark:bg-zinc-900/90 dark:ring-white/5 overflow-hidden">
-              <div className="flex items-center justify-between pb-1.5 shrink-0 border-b border-slate-100 dark:border-zinc-800">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
-                    Rythme de Production du Poste (Aujourd'hui)
-                  </span>
-                </div>
-                <div className="flex items-center gap-3.5 text-xs font-semibold text-slate-500">
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-1 w-3.5 rounded-full bg-sky-500 shadow-[0_0_6px_rgba(14,165,233,0.6)]" />
-                    Cadence réelle
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-1 w-3.5 rounded-full bg-slate-300 dark:bg-zinc-700" />
-                    Objectif 120 u/min
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex-1 min-h-0 w-full pt-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartCadenceData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="cadenceGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.25" />
-                        <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0.0" />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis
-                      dataKey="heure"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 10, fill: "#94a3b8" }}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 10, fill: "#94a3b8" }}
-                      domain={[0, Math.max(140, cadenceNominale + 20)]}
-                    />
-                    <ReferenceLine y={cadenceNominale} stroke="#cbd5e1" strokeDasharray="3 3" />
-                    <Tooltip content={<CadenceTooltip />} />
-                    <Area
-                      type="monotone"
-                      dataKey="cadence"
-                      stroke="#0ea5e9"
-                      strokeWidth={2.5}
-                      fill="url(#cadenceGrad)"
-                      activeDot={{ r: 4, stroke: "#0ea5e9", strokeWidth: 2, fill: "#fff" }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* LES POSTES DE LA LIGNE (5 cols) */}
-            <div className="md:col-span-5 flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_12px_36px_-6px_rgba(0,0,0,0.06),0_4px_12px_-2px_rgba(0,0,0,0.02)] ring-1 ring-slate-900/5 dark:border-zinc-800 dark:bg-zinc-900/90 dark:ring-white/5 overflow-hidden">
-              <div className="flex items-center justify-between pb-1.5 shrink-0 border-b border-slate-100 dark:border-zinc-800">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
-                  État des Postes de Travail
-                </span>
-                <span className={cn(
-                  "text-xs font-bold px-2 py-0.5 rounded-md border",
-                  nbEnMarche > 0
-                    ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500/20"
-                    : "text-slate-500 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700"
-                )}>
-                  {nbEnMarche}/{totalMachines} En marche
-                </span>
-              </div>
-
-              <div className="flex-1 min-h-0 flex flex-col gap-2 py-1 overflow-y-auto max-h-[220px]">
-                {machinesAffichees.map((machine, idx) => (
-                  <div
-                    key={machine.code || idx}
-                    className="flex items-center justify-between p-3 rounded-xl border border-slate-200/70 bg-gradient-to-b from-white to-slate-50/70 shadow-[0_4px_14px_-2px_rgba(0,0,0,0.04)] ring-1 ring-slate-900/5 hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200 dark:border-zinc-800 dark:from-zinc-900 dark:to-zinc-800/60"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "size-2 rounded-full",
-                        machine.enMarche
-                          ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"
-                          : machine.enPanne
-                          ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
-                          : "bg-slate-300 dark:bg-zinc-600"
-                      )} />
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-extrabold text-slate-900 dark:text-white">
-                            {machine.code}
-                          </span>
-                          <span className="text-xs text-slate-500 dark:text-zinc-400 font-medium truncate max-w-[140px]">
-                            • {machine.nom}
-                          </span>
-                        </div>
-                        <span className={cn(
-                          "text-[11px] font-semibold",
-                          machine.enMarche
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : machine.enPanne
-                            ? "text-amber-600 dark:text-amber-400"
-                            : "text-slate-400 dark:text-zinc-500"
-                        )}>
-                          {machine.statut}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-xs font-black text-slate-800 dark:text-zinc-200 block">
-                        {machine.cadence}
-                      </span>
-                      <span className="text-[10.5px] text-slate-400 font-bold">
-                        Rendement {machine.rendement}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modales pour le Studio Sparkplug B et les Prélèvements MP */}
-      <SparkplugStudioModal
-        open={sparkplugOpen}
-        onClose={() => setSparkplugOpen(false)}
-        onActionComplete={refresh}
-      />
-
-      <PrelevementModal
-        open={prelevementOpen}
-        onClose={() => setPrelevementOpen(false)}
-        onActionComplete={refresh}
-      />
     </div>
   )
 }

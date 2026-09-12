@@ -133,7 +133,7 @@ export function Gauge({
 
       <div className="-mt-1 flex flex-col items-center">
         <span
-          className={cn("font-mono font-bold leading-none tabular-nums", tone)}
+          className={cn("font-mono font-semibold leading-none tabular-nums", tone)}
           style={{ fontSize: Math.max(16, size * (emphasis === "hero" ? 0.22 : 0.19)) }}
         >
           {Math.round(pct * 100)}
@@ -143,7 +143,7 @@ export function Gauge({
           <span
             className={cn(
               "mt-1 text-center font-medium text-muted-foreground",
-              emphasis === "hero" && "uppercase tracking-wide",
+              emphasis === "hero" && "",
             )}
             style={{ fontSize: Math.max(10, size * 0.072) }}
           >

@@ -6,7 +6,6 @@ import type { NavView } from "@/components/Sidebar"
 import type { DocumentFocus, DocumentPassage } from "@/lib/types"
 import { DocumentsPage } from "@/components/dashboard/DocumentsPage"
 import { MesDashboardPage } from "@/components/dashboard/MesDashboardPage"
-import { MachinesPage } from "@/components/dashboard/MachinesPage"
 import { TRSPage } from "@/components/dashboard/TRSPage"
 import { ArretsPage } from "@/components/dashboard/ArretsPage"
 import { QualitePage } from "@/components/dashboard/QualitePage"
@@ -17,9 +16,7 @@ import { ArticlesPage } from "@/components/dashboard/ArticlesPage"
 import { MatieresPage } from "@/components/dashboard/MatieresPage"
 import { LignesPage } from "@/components/dashboard/LignesPage"
 import { FournisseursPage } from "@/components/dashboard/FournisseursPage"
-import { SimulateurPage } from "@/components/dashboard/SimulateurPage"
-import { NovaVoicePage } from "@/components/dashboard/NovaVoicePage"
-import { DigitalTwinPage } from "@/components/twin/DigitalTwinPage"
+import { AfnorScreen } from "@/components/dashboard/AfnorScreen"
 import { LoginPage } from "@/components/auth/LoginPage"
 import { AdminUsersPage } from "@/components/admin/AdminUsersPage"
 import { aiChatBus } from "@/lib/aiChatBus"
@@ -28,9 +25,8 @@ import { canAccessView, firstAccessibleView } from "@/lib/permissions"
 
 const NAV_VIEWS: NavView[] = [
   "dashboard",
-  "machines",
-  "jumeau",
   "trs",
+  "afnor",
   "arrets",
   "qualite",
   "maintenance",
@@ -41,15 +37,12 @@ const NAV_VIEWS: NavView[] = [
   "lignes",
   "fournisseurs",
   "documents",
-  "simulateur",
-  "assistant",
 ]
 
 export const VIEW_TITLES: Record<NavView, string> = {
   dashboard: "Tableau de bord MES",
-  machines: "Machines & Postes",
-  jumeau: "Jumeau Numérique 3D",
   trs: "TRS & Pertes de Rendement",
+  afnor: "Norme AFNOR NF E 60-182",
   arrets: "Journal des Arrêts",
   qualite: "Contrôle Qualité & Rejets",
   maintenance: "Maintenance & Interventions",
@@ -60,8 +53,6 @@ export const VIEW_TITLES: Record<NavView, string> = {
   lignes: "Lignes de Production",
   fournisseurs: "Fournisseurs",
   documents: "Documentation Technique & BPF",
-  simulateur: "Simulateur de Production",
-  assistant: "Assistant Vocal Nova",
 }
 
 function isNavView(value: string | undefined): value is NavView {
@@ -74,7 +65,6 @@ function AppContent({ view }: { view: NavView }) {
   const [ligneId, setLigneId] = useState<number | null>(null)
   const [docFocus, setDocFocus] = useState<DocumentFocus | null>(null)
   const [aiPanelOpen, setAiPanelOpen] = useState(false)
-  const [twinFullscreen, setTwinFullscreen] = useState(false)
 
   // Permet à tout composant (ou bouton AI) d'ouvrir le panneau Nova
   useEffect(() => {
@@ -86,13 +76,6 @@ function AppContent({ view }: { view: NavView }) {
   useEffect(() => {
     const titre = VIEW_TITLES[view] || "Supervision"
     document.title = `${titre} — Nova`
-  }, [view])
-
-  // Le jumeau numérique se pilote via Nova : on ouvre l'assistant à droite
-  // dès qu'on arrive sur cette page. Quitter la page quitte le plein écran.
-  useEffect(() => {
-    if (view === "jumeau") setAiPanelOpen(true)
-    else setTwinFullscreen(false)
   }, [view])
 
   /** L'agent a cité des documents : ouvre le viewer PDF sur le premier passage localisable. */
@@ -114,21 +97,10 @@ function AppContent({ view }: { view: NavView }) {
     switch (view) {
       case "dashboard":
         return <MesDashboardPage ligneId={ligneId} onChangeLigne={setLigneId} />
-      case "machines":
-        return <MachinesPage ligneId={ligneId} />
-      case "jumeau":
-        // Jumeau numérique 3D de la ligne de conditionnement (temps réel).
-        return (
-          <DigitalTwinPage
-            ligneId={ligneId}
-            onChangeLigne={setLigneId}
-            fullscreen={twinFullscreen}
-            onFullscreenChange={setTwinFullscreen}
-            onAskNova={askNova}
-          />
-        )
       case "trs":
         return <TRSPage ligneId={ligneId} />
+      case "afnor":
+        return <AfnorScreen />
       case "arrets":
         return <ArretsPage />
       case "qualite":
@@ -149,12 +121,6 @@ function AppContent({ view }: { view: NavView }) {
         return <FournisseursPage />
       case "documents":
         return <DocumentsPage focus={docFocus} onClearFocus={() => setDocFocus(null)} />
-      case "simulateur":
-        return <SimulateurPage />
-      case "assistant":
-        // Mode voix plein écran : navigation désactivée (navigationEnabled=false),
-        // seule l'instance du panneau latéral pilote les changements de page.
-        return <NovaVoicePage navigationEnabled={false} />
     }
   }
 
@@ -168,7 +134,6 @@ function AppContent({ view }: { view: NavView }) {
         onDocumentsPassages={handleDocumentsPassages}
         aiPanelOpen={aiPanelOpen}
         onAiPanelOpenChange={setAiPanelOpen}
-        immersive={view === "jumeau" && twinFullscreen}
       >
         {renderView()}
       </AppShell>

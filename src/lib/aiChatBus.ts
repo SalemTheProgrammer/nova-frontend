@@ -5,7 +5,7 @@
  *
  * Le panneau IA n'est monté que lorsqu'il est ouvert : si un message est émis
  * juste avant (ouverture + émission dans le même geste), on le tamponne et on
- * le rejoue dès que le panneau enregistre son handler (même pattern que twinBus).
+ * le rejoue dès que le panneau enregistre son handler.
  */
 type Handler = (texte: string) => void
 type OpenHandler = () => void
