@@ -8,7 +8,7 @@ import {
   type KeyboardEvent,
 } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, Loader2, MessageCircle, Phone, ShieldCheck } from "lucide-react"
+import { ArrowLeft, Eye, Loader2, MessageCircle, Phone, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -142,10 +142,40 @@ export function LoginPage() {
   const [code, setCode] = useState("")
   const [erreur, setErreur] = useState<string | null>(null)
   const [chargement, setChargement] = useState(false)
+  const [demoDisponible, setDemoDisponible] = useState(false)
 
   useEffect(() => {
     document.title = "Connexion — Nova MES"
   }, [])
+
+  // Le mode démonstration est piloté par le backend (DEMO_LOGIN_ENABLED) : on
+  // n'affiche le bouton que s'il répond, pour ne pas promettre un accès fermé.
+  useEffect(() => {
+    let annule = false
+    authApi
+      .demoDisponible()
+      .then((dispo) => {
+        if (!annule) setDemoDisponible(dispo)
+      })
+      .catch(() => {})
+    return () => {
+      annule = true
+    }
+  }, [])
+
+  async function entrerEnDemo() {
+    setErreur(null)
+    setChargement(true)
+    try {
+      const { token, user } = await authApi.demo()
+      login(token, user)
+      navigate("/app/dashboard", { replace: true })
+    } catch (err) {
+      setErreur(err instanceof Error ? err.message : "Le mode démonstration est indisponible.")
+    } finally {
+      setChargement(false)
+    }
+  }
 
   async function demanderCode(e?: FormEvent) {
     if (e) e.preventDefault()
@@ -241,6 +271,26 @@ export function LoginPage() {
                   </>
                 )}
               </Button>
+
+              {/* Accès démonstration : une session lecture seule, sans code.
+                  Le bouton n'apparaît que si le backend l'autorise
+                  (DEMO_LOGIN_ENABLED) — voir entrerEnDemo(). */}
+              {demoDisponible && (
+                <div className="space-y-2 border-t border-border pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => void entrerEnDemo()}
+                    disabled={chargement}
+                  >
+                    <Eye className="mr-2 size-4" /> Entrer en mode démonstration
+                  </Button>
+                  <p className="text-center text-xs text-muted-foreground">
+                    Sans code : consultation seule, aucune commande machine.
+                  </p>
+                </div>
+              )}
             </form>
           ) : (
             <form

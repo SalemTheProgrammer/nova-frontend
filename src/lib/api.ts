@@ -616,6 +616,10 @@ export const authApi = {
   verifyCode: (telephone: string, code: string) =>
     api.post<{ token: string; user: User }>("/auth/verify-code", { telephone, code }),
   me: () => api.get<User>("/auth/me"),
+  /** Session de démonstration (lecture seule), sans code WhatsApp. */
+  demo: () => api.post<{ token: string; user: User }>("/auth/demo", {}),
+  demoDisponible: () =>
+    api.get<{ enabled: boolean }>("/auth/demo").then((r) => r.enabled),
 }
 
 export const adminApi = {
