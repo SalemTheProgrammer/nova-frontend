@@ -26,7 +26,7 @@ import type { DocumentPassage } from "@/lib/types"
 
 const VALID_VIEWS: readonly string[] = [
   "dashboard",
-  "trs",
+  "afnor",
   "arrets",
   "qualite",
   "maintenance",

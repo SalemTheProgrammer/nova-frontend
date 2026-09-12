@@ -12,7 +12,6 @@ import type { User } from "@/lib/api"
  */
 const NAV_CATEGORIES: Partial<Record<NavView, string[]>> = {
   dashboard: ["Supervision / MES"],
-  trs: ["Supervision / MES"],
   afnor: ["Supervision / MES"],
   arrets: ["Supervision / MES", "Actions machine"],
   maintenance: ["Actions machine"],
@@ -27,6 +26,7 @@ const NAV_CATEGORIES: Partial<Record<NavView, string[]>> = {
 
 export function canAccessView(user: User | null, view: NavView): boolean {
   if (!user) return false
+  if (view === "admin") return Boolean(user.is_admin)
   if (user.is_admin) return true
   const requises = NAV_CATEGORIES[view]
   if (!requises) return true

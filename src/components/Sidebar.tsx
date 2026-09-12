@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
 import {
   Activity,
   AlertTriangle,
   BookOpen,
   Check,
+  CalendarRange,
   ClipboardList,
   Factory,
   FlaskConical,
@@ -18,7 +18,6 @@ import {
   WifiOff,
   Wrench,
   X,
-  Layers,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { lignesApi } from "@/lib/api"
@@ -29,7 +28,6 @@ import { canAccessView } from "@/lib/permissions"
 
 export type NavView =
   | "dashboard"
-  | "trs"
   | "afnor"
   | "arrets"
   | "qualite"
@@ -41,6 +39,7 @@ export type NavView =
   | "lignes"
   | "fournisseurs"
   | "documents"
+  | "admin"
 
 interface NavItem {
   view: NavView
@@ -87,16 +86,10 @@ const CATEGORIES: CategoryConfig[] = [
     icon: Activity,
     items: [
       {
-        view: "trs",
-        label: "TRS & Rendement",
-        description: "Taux de Rendement Synthétique, B/P/Q",
-        icon: Activity,
-      },
-      {
         view: "afnor",
-        label: "Norme AFNOR",
-        description: "Décomposition emboîtée NF E 60-182 par OF",
-        icon: Layers,
+        label: "Diagramme de Gantt",
+        description: "Décomposition des temps et indicateurs de performance",
+        icon: CalendarRange,
       },
       {
         view: "arrets",
@@ -178,7 +171,6 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
   const [activeDrawer, setActiveDrawer] = useState<DrawerCategory>(null)
   const { connected } = useWebSocket()
   const { user, logout } = useAuth()
-  const navigate = useNavigate()
 
   useEffect(() => {
     lignesApi.list().then(setLignes).catch(() => {})
@@ -327,9 +319,14 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
             <div className="group relative">
               <button
                 type="button"
-                onClick={() => navigate("/admin")}
+                onClick={() => handleSelectView("admin")}
                 title="Administration"
-                className="flex size-11 items-center justify-center rounded-xl text-muted-foreground transition-all hover:bg-accent hover:text-foreground"
+                className={cn(
+                  "flex size-11 items-center justify-center rounded-xl transition-all cursor-pointer",
+                  view === "admin"
+                    ? "bg-violet-600 text-white shadow-md shadow-violet-500/30 font-bold"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                )}
               >
                 <UserCog className="size-5" />
               </button>

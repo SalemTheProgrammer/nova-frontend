@@ -330,7 +330,42 @@ export const fournisseursApi = {
   create: (data: Partial<Fournisseur>) => api.post<Fournisseur>("/fournisseurs", data),
   update: (id: number, data: Partial<Fournisseur>) =>
     api.patch<Fournisseur>(`/fournisseurs/${id}`, data),
-  remove: (id: number) => api.del(`/fournisseurs/${id}`),
+  contacts: (params?: {
+    page?: number
+    page_size?: number
+    role_level?: string
+    fournisseur_id?: number
+    search?: string
+  }) => {
+    const query = new URLSearchParams()
+    if (params?.page) query.set("page", String(params.page))
+    if (params?.page_size) query.set("page_size", String(params.page_size))
+    if (params?.role_level && params.role_level !== "tous") query.set("role_level", params.role_level)
+    if (params?.fournisseur_id != null) query.set("fournisseur_id", String(params.fournisseur_id))
+    if (params?.search) query.set("search", params.search)
+    const qs = query.toString()
+    return api.get<FournisseurContactPage>(`/fournisseurs/contacts${qs ? `?${qs}` : ""}`)
+  },
+  createContact: (data: {
+    fournisseur_id: number
+    nom: string
+    role_level: RoleLevel
+    poste: string
+    telephone: string
+    email?: string
+  }) => api.post<FournisseurContact>("/fournisseurs/contacts", data),
+  updateContact: (
+    id: number,
+    data: Partial<{
+      fournisseur_id: number
+      nom: string
+      role_level: RoleLevel
+      poste: string
+      telephone: string
+      email: string
+    }>,
+  ) => api.patch<FournisseurContact>(`/fournisseurs/contacts/${id}`, data),
+  deleteContact: (id: number) => api.del(`/fournisseurs/contacts/${id}`),
 }
 
 // --------------------------- Lignes de production --------------------------- //
@@ -463,18 +498,37 @@ export const downtimeApi = {
 
 // --------------------------- Qualité --------------------------- //
 export const qualiteApi = {
-  evenements: (machineId?: number) =>
-    api.get<QualityEventRead[]>(
-      `/qualite/evenements${machineId ? `?machine_id=${machineId}` : ""}`,
-    ),
+  evenements: (machineId?: number, limit: number = 1000) => {
+    const qs = new URLSearchParams()
+    if (machineId) qs.append("machine_id", String(machineId))
+    qs.append("limit", String(limit))
+    return api.get<QualityEventRead[]>(`/qualite/evenements?${qs.toString()}`)
+  },
   resume: (machineId?: number) =>
     api.get<QualiteResume>(`/qualite/resume${machineId ? `?machine_id=${machineId}` : ""}`),
 }
 
 // --------------------------- Maintenance --------------------------- //
+export interface RisqueMachine {
+  machine_id: number
+  code: string
+  nom: string
+  score: number
+  nb_pannes_7j: number
+  duree_arret_7j_s: number
+  jours_depuis_maintenance: number | null
+  niveau: "faible" | "modere" | "eleve"
+  recommandation: string
+}
+
 export const maintenanceApi = {
   list: (machineId?: number) =>
     api.get<MaintenanceEventRead[]>(`/maintenance${machineId ? `?machine_id=${machineId}` : ""}`),
+  risques: () => api.get<RisqueMachine[]>("/maintenance/risques"),
+  demarrer: (data: { machine_id: number; type_maintenance: string; description?: string }) =>
+    api.post<{ status: string; message: string }>("/maintenance/demarrer", data),
+  resoudre: (data: { machine_id: number; commentaire?: string }) =>
+    api.post<{ status: string; message: string }>("/maintenance/resoudre", data),
 }
 
 // --------------------------- KPI / TRS / Dashboard --------------------------- //
@@ -623,4 +677,29 @@ export const prelevementApi = {
     },
   ) => api.post<PrelevementMP>(`/prelevements/${id}/valider`, data),
 }
+
+// --------------------- Fournisseurs & Contacts --------------------- //
+export type RoleLevel = "directeur" | "sous_directeur" | "chef" | "employe"
+
+export interface FournisseurContact {
+  id: number
+  fournisseur_id: number
+  nom: string
+  role_level: RoleLevel
+  poste: string
+  telephone: string
+  email: string
+  fournisseur_nom?: string | null
+  fournisseur_code?: string | null
+}
+
+export interface FournisseurContactPage {
+  items: FournisseurContact[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+  counts: Record<string, number>
+}
+
 

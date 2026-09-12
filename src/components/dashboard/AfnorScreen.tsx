@@ -100,8 +100,11 @@ export function AfnorScreen({ initialOfId }: { initialOfId?: number | null }) {
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-white dark:bg-zinc-950 p-1 sm:p-2 text-zinc-900 dark:text-zinc-100 select-none">
       {/* Barre compacte d'en-tête et sélection d'OF */}
-      <div className="mb-1 flex shrink-0 items-center justify-between gap-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-2 py-1 shadow-2xs">
+      <div className="mb-1 flex shrink-0 items-center justify-between gap-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-2.5 py-1.5 shadow-2xs">
         <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 shrink-0 pr-2.5 border-r border-zinc-300 dark:border-zinc-700">
+            Diagramme de Gantt
+          </span>
           <Box className="size-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
           <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 shrink-0">
             Ordre de fabrication :

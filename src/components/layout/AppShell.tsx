@@ -92,7 +92,7 @@ export function AppShell({
             <p className="truncate text-sm font-semibold">Nova MES</p>
           </header>
           <main
-            className={`flex min-h-0 min-w-0 flex-1 flex-col ${view === "dashboard" || view === "afnor" ? "overflow-hidden" : "overflow-y-auto"}`}
+            className={`flex min-h-0 min-w-0 flex-1 flex-col ${view === "dashboard" || view === "afnor" || view === "arrets" || view === "qualite" ? "overflow-hidden" : "overflow-y-auto"}`}
           >
             {children}
           </main>

@@ -6,7 +6,6 @@ import type { NavView } from "@/components/Sidebar"
 import type { DocumentFocus, DocumentPassage } from "@/lib/types"
 import { DocumentsPage } from "@/components/dashboard/DocumentsPage"
 import { MesDashboardPage } from "@/components/dashboard/MesDashboardPage"
-import { TRSPage } from "@/components/dashboard/TRSPage"
 import { ArretsPage } from "@/components/dashboard/ArretsPage"
 import { QualitePage } from "@/components/dashboard/QualitePage"
 import { MaintenancePage } from "@/components/dashboard/MaintenancePage"
@@ -25,7 +24,6 @@ import { canAccessView, firstAccessibleView } from "@/lib/permissions"
 
 const NAV_VIEWS: NavView[] = [
   "dashboard",
-  "trs",
   "afnor",
   "arrets",
   "qualite",
@@ -37,12 +35,12 @@ const NAV_VIEWS: NavView[] = [
   "lignes",
   "fournisseurs",
   "documents",
+  "admin",
 ]
 
 export const VIEW_TITLES: Record<NavView, string> = {
   dashboard: "Tableau de bord MES",
-  trs: "TRS & Pertes de Rendement",
-  afnor: "Norme AFNOR NF E 60-182",
+  afnor: "Diagramme de Gantt",
   arrets: "Journal des Arrêts",
   qualite: "Contrôle Qualité & Rejets",
   maintenance: "Maintenance & Interventions",
@@ -53,6 +51,7 @@ export const VIEW_TITLES: Record<NavView, string> = {
   lignes: "Lignes de Production",
   fournisseurs: "Fournisseurs",
   documents: "Documentation Technique & BPF",
+  admin: "Administration & Sécurité",
 }
 
 function isNavView(value: string | undefined): value is NavView {
@@ -97,8 +96,6 @@ function AppContent({ view }: { view: NavView }) {
     switch (view) {
       case "dashboard":
         return <MesDashboardPage ligneId={ligneId} onChangeLigne={setLigneId} />
-      case "trs":
-        return <TRSPage ligneId={ligneId} />
       case "afnor":
         return <AfnorScreen />
       case "arrets":
@@ -121,6 +118,8 @@ function AppContent({ view }: { view: NavView }) {
         return <FournisseursPage />
       case "documents":
         return <DocumentsPage focus={docFocus} onClearFocus={() => setDocFocus(null)} />
+      case "admin":
+        return <AdminUsersPage />
     }
   }
 
@@ -144,6 +143,7 @@ function AppContent({ view }: { view: NavView }) {
 function ViewRoute() {
   const { view } = useParams<{ view: string }>()
   const { user } = useAuth()
+  if (view === "trs") return <Navigate to="/app/afnor" replace />
   if (!isNavView(view)) return <Navigate to={`/app/${firstAccessibleView(user)}`} replace />
   // Garde-fou pour un lien direct/marque-page vers une page hors du périmètre
   // de l'utilisateur — la nav (Sidebar) cache déjà ces entrées, mais l'URL
@@ -172,15 +172,6 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-/** Réservé à l'administrateur : les autres retournent au dashboard. */
-function RequireAdmin({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth()
-  if (loading) return <AuthLoading />
-  if (!user) return <Navigate to="/login" replace />
-  if (!user.is_admin) return <Navigate to="/app/dashboard" replace />
-  return <>{children}</>
-}
-
 function App() {
   const { user, loading } = useAuth()
   return (
@@ -191,14 +182,7 @@ function App() {
           loading ? <AuthLoading /> : user ? <Navigate to="/app/dashboard" replace /> : <LoginPage />
         }
       />
-      <Route
-        path="/admin"
-        element={
-          <RequireAdmin>
-            <AdminUsersPage />
-          </RequireAdmin>
-        }
-      />
+      <Route path="/admin" element={<Navigate to="/app/admin" replace />} />
       <Route
         path="/app/:view"
         element={
