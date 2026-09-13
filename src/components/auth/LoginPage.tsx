@@ -8,7 +8,7 @@ import {
   type KeyboardEvent,
 } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, Eye, Loader2, MessageCircle, Phone, ShieldCheck } from "lucide-react"
+import { ArrowLeft, ExternalLink, Eye, Factory, Loader2, MessageCircle, Phone, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -130,6 +130,13 @@ function OtpInput({
     </div>
   )
 }
+
+/** Panneau de l'usine simulée (badges opérateurs). En prod il est servi par
+ * nginx sous /simulateur/ ; en dev, le simulateur tourne sur le port 8090.
+ * `VITE_SIMULATOR_URL` permet de viser une autre adresse. */
+const SIMULATEUR_URL =
+  import.meta.env.VITE_SIMULATOR_URL ??
+  (import.meta.env.DEV ? "http://localhost:8090/" : "/simulateur/")
 
 const BOUTON_PRINCIPAL =
   "h-12 w-full rounded-lg bg-foreground text-base font-medium text-background transition-colors hover:bg-foreground/90 active:scale-[0.99]"
@@ -349,9 +356,23 @@ export function LoginPage() {
           )}
         </div>
 
-        <p className="text-sm text-muted-foreground">
-          Pas encore d'accès ? Demandez-le à votre responsable d'atelier ou à l'administrateur Nova.
-        </p>
+        <div className="space-y-3">
+          {/* Panneau de l'usine simulée : badges opérateurs, cartes d'arrêt,
+              incidents. Protégé par son propre mot de passe (nginx). */}
+          <a
+            href={SIMULATEUR_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-sm font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            <Factory className="size-4" />
+            Simulateur d'atelier — badges opérateurs
+            <ExternalLink className="size-3.5 text-muted-foreground" />
+          </a>
+          <p className="text-sm text-muted-foreground">
+            Pas encore d'accès ? Demandez-le à votre responsable d'atelier ou à l'administrateur Nova.
+          </p>
+        </div>
       </div>
 
       {/* Visuel */}
