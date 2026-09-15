@@ -1,7 +1,31 @@
+import { Fragment, type ReactNode } from "react"
 import { AlertTriangle, Check, Loader2, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ArtifactCard } from "@/components/agent/ArtifactCard"
 import type { AgentSegment, AgentTurn } from "@/hooks/useAgentChat"
+
+/** Rend le gras `**texte**` et l'italique `*texte*` d'une réponse de l'agent en
+ * vrais éléments (jamais d'injection HTML) : le modèle renvoie du markdown léger,
+ * et l'afficher tel quel laissait des astérisques visibles à l'écran. */
+function texteRiche(contenu: string): ReactNode {
+  const noeuds: ReactNode[] = []
+  // Alterne hors-marqueur / **gras** / *italique* en préservant les retours ligne.
+  const motif = /\*\*([^*]+)\*\*|\*([^*\n]+)\*/g
+  let dernier = 0
+  let m: RegExpExecArray | null
+  let cle = 0
+  while ((m = motif.exec(contenu)) !== null) {
+    if (m.index > dernier) noeuds.push(contenu.slice(dernier, m.index))
+    if (m[1] !== undefined) {
+      noeuds.push(<strong key={cle++}>{m[1]}</strong>)
+    } else {
+      noeuds.push(<em key={cle++}>{m[2]}</em>)
+    }
+    dernier = motif.lastIndex
+  }
+  if (dernier < contenu.length) noeuds.push(contenu.slice(dernier))
+  return noeuds.map((n, i) => <Fragment key={i}>{n}</Fragment>)
+}
 
 /** Libellés français des outils : ce que l'opérateur voit pendant que Nova travaille. */
 const TOOL_LABEL: Record<string, string> = {
@@ -142,7 +166,7 @@ export function AgentTurnView({
                   : "rounded-2xl rounded-tl-xs bg-background border border-border/80 px-3.5 py-2.5 text-foreground shadow-xs w-full",
               )}
             >
-              {segment.content}
+              {texteRiche(segment.content)}
             </div>
           ) : (
             <ToolStep key={segment.id} segment={segment} onQuickReply={onQuickReply} />
