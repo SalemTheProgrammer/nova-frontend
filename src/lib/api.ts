@@ -620,6 +620,14 @@ export const authApi = {
   demo: () => api.post<{ token: string; user: User }>("/auth/demo", {}),
   demoDisponible: () =>
     api.get<{ enabled: boolean }>("/auth/demo").then((r) => r.enabled),
+  /** Prépare l'état de démonstration (bouton « Réinitialiser l'usine »). */
+  resetUsine: () =>
+    api.post<{
+      machines_demarrees: string[]
+      arrets_injectes: number
+      articles_chiffres: number
+      of_a_l_heure: number
+    }>("/auth/demo/reset-usine", {}),
 }
 
 export const adminApi = {

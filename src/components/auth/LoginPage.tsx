@@ -8,7 +8,7 @@ import {
   type KeyboardEvent,
 } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, ExternalLink, Eye, Factory, Loader2, MessageCircle, Phone, ShieldCheck } from "lucide-react"
+import { ArrowLeft, ExternalLink, Eye, Factory, Loader2, MessageCircle, Phone, RotateCcw, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -150,10 +150,24 @@ export function LoginPage() {
   const [erreur, setErreur] = useState<string | null>(null)
   const [chargement, setChargement] = useState(false)
   const [demoDisponible, setDemoDisponible] = useState(false)
+  const [resetEtat, setResetEtat] = useState<"repos" | "cours" | "fait" | "erreur">("repos")
 
   useEffect(() => {
     document.title = "Connexion — Nova MES"
   }, [])
+
+  async function reinitialiserUsine() {
+    if (resetEtat === "cours") return
+    setResetEtat("cours")
+    try {
+      await authApi.resetUsine()
+      setResetEtat("fait")
+      setTimeout(() => setResetEtat("repos"), 6000)
+    } catch {
+      setResetEtat("erreur")
+      setTimeout(() => setResetEtat("repos"), 6000)
+    }
+  }
 
   // Le mode démonstration est piloté par le backend (DEMO_LOGIN_ENABLED) : on
   // n'affiche le bouton que s'il répond, pour ne pas promettre un accès fermé.
@@ -229,6 +243,34 @@ export function LoginPage() {
 
   return (
     <div className="flex h-dvh w-full overflow-hidden bg-background">
+      {/* Bouton de démonstration : dans le coin, réinitialise l'usine en un clic.
+          Visible uniquement quand le backend a le mode démo activé. */}
+      {demoDisponible && (
+        <button
+          type="button"
+          onClick={reinitialiserUsine}
+          disabled={resetEtat === "cours"}
+          title="Prépare un état de démonstration : usine relancée, coûts réalistes, arrêts pour le Pareto"
+          className={cn(
+            "fixed right-4 top-4 z-50 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm transition-colors",
+            resetEtat === "fait"
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
+              : resetEtat === "erreur"
+                ? "border-destructive/40 bg-destructive/10 text-destructive"
+                : "border-border bg-background text-foreground hover:bg-accent",
+          )}
+        >
+          <RotateCcw className={cn("size-4", resetEtat === "cours" && "animate-spin")} />
+          {resetEtat === "cours"
+            ? "Réinitialisation…"
+            : resetEtat === "fait"
+              ? "Usine prête ✓"
+              : resetEtat === "erreur"
+                ? "Échec — réessayer"
+                : "Réinitialiser l'usine"}
+        </button>
+      )}
+
       {/* Formulaire */}
       <div className="flex h-full w-full flex-col justify-between overflow-y-auto p-6 sm:p-10 lg:w-1/2 lg:p-14">
         <img src="/r.png" alt="Nova" className="h-10 w-auto self-start object-contain" />
