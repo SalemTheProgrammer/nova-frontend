@@ -84,7 +84,7 @@ export function RightAIAgent({
     },
   )
   const scrollRef = useRef<HTMLDivElement | null>(null)
-  const { decisions, autresEnAttente, appliquer } = useDecisions(pret ? turns.length : null)
+  const { decisions, appliquer } = useDecisions(pret ? turns.length : null)
   // Chaque décision s'affiche là où elle est arrivée dans la conversation ;
   // `jusquAuBout` regroupe celles arrivées après le dernier tour.
   const decisionsA = (position: number, jusquAuBout = false) =>
@@ -235,13 +235,6 @@ export function RightAIAgent({
           </div>
         )}
         {decisionsA(turns.length, true)}
-        {autresEnAttente > 0 && (
-          <p className="pl-10 text-xs text-muted-foreground">
-            {autresEnAttente} autre{autresEnAttente > 1 ? "s" : ""} décision
-            {autresEnAttente > 1 ? "s" : ""} en attente : demandez à Nova « quelles décisions
-            sont en attente ? »
-          </p>
-        )}
       </div>
 
       {/* Saisie + voix style Sidebar */}

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react"
 import { chatAccueil } from "@/lib/api"
 
-/** Vitesse de frappe simulée (ms par caractère). */
-const VITESSE_MS = 16
+/** Vitesse de frappe simulée (ms par caractère). Rythme moyen : ni saccadé, ni lent. */
+const VITESSE_MS = 24
 /** Durée minimale des « … » : Nova a l'air de réfléchir avant d'écrire. */
 const REFLEXION_MS = 1100
 
@@ -67,7 +67,7 @@ export function NovaGreeting({
 
   useEffect(() => {
     if (messages == null || tapes >= total) return
-    const t = setTimeout(() => setTapes((n) => n + 2), VITESSE_MS)
+    const t = setTimeout(() => setTapes((n) => n + 1), VITESSE_MS)
     return () => clearTimeout(t)
   }, [messages, tapes, total])
 
