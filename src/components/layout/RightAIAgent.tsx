@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react"
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react"
 import {
   ArrowUp,
   Loader2,
@@ -18,8 +18,6 @@ import { useVoice } from "@/hooks/useVoice"
 import { useWebSocket } from "@/hooks/useWebSocket"
 import { AgentTurnView } from "@/components/agent/AgentMessage"
 import { NovaGreeting } from "@/components/agent/NovaGreeting"
-import { DecisionMessage } from "@/components/agent/DecisionMessage"
-import { useDecisions } from "@/hooks/useDecisions"
 import { NovaLogo } from "@/components/NovaLogo"
 import type { NavView } from "@/components/Sidebar"
 import type { DocumentPassage } from "@/lib/types"
@@ -84,15 +82,6 @@ export function RightAIAgent({
     },
   )
   const scrollRef = useRef<HTMLDivElement | null>(null)
-  const { decisions, appliquer } = useDecisions(pret ? turns.length : null)
-  // Chaque décision s'affiche là où elle est arrivée dans la conversation ;
-  // `jusquAuBout` regroupe celles arrivées après le dernier tour.
-  const decisionsA = (position: number, jusquAuBout = false) =>
-    decisions
-      .filter((d) => (jusquAuBout ? d.position >= position : d.position === position))
-      .map((d) => (
-        <DecisionMessage key={d.proposition.id} proposition={d.proposition} onDecidee={appliquer} />
-      ))
 
   // Accueil de Nova : seulement pour une conversation vide, et une fois
   // l'historique éventuel rechargé (sinon il s'afficherait puis disparaîtrait).
@@ -112,7 +101,7 @@ export function RightAIAgent({
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
-  }, [turns, loading, decisions])
+  }, [turns, loading])
 
   function handleSubmit(e?: FormEvent) {
     e?.preventDefault()
@@ -220,11 +209,12 @@ export function RightAIAgent({
         {accueil && (
           <NovaGreeting key={accueilKey} threadId={threadActuel()} onThread={adopterThread} />
         )}
-        {turns.map((turn, i) => (
-          <Fragment key={turn.id}>
-            {decisionsA(i)}
-            <AgentTurnView turn={turn} onQuickReply={(text) => void send(text)} />
-          </Fragment>
+        {turns.map((turn) => (
+          <AgentTurnView
+            key={turn.id}
+            turn={turn}
+            onQuickReply={(text) => void send(text)}
+          />
         ))}
         {loading && turns[turns.length - 1]?.segments.length === 0 && (
           <div className="flex items-center gap-2 pl-10 text-xs text-muted-foreground">
@@ -234,7 +224,6 @@ export function RightAIAgent({
             <span>Nova analyse votre requête…</span>
           </div>
         )}
-        {decisionsA(turns.length, true)}
       </div>
 
       {/* Saisie + voix style Sidebar */}
