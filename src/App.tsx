@@ -4,7 +4,7 @@ import { AppShell } from "@/components/layout/AppShell"
 import type { NavView } from "@/components/Sidebar"
 import type { DocumentFocus, DocumentPassage } from "@/lib/types"
 import { DocumentsPage } from "@/components/shared/DocumentsPage"
-import { EnConstruction } from "@/components/shared/EnConstruction"
+import { RapportsPage } from "@/components/tunicotex/pages/RapportsPage"
 import { LoginPage } from "@/components/auth/LoginPage"
 import { AdminUsersPage } from "@/components/admin/AdminUsersPage"
 import { AtelierPage } from "@/components/tunicotex/pages/AtelierPage"
@@ -81,7 +81,7 @@ function AppContent({ view }: { view: NavView }) {
       case "commandes":
         return <CommandesPage />
       case "rapports":
-        return <EnConstruction />
+        return <RapportsPage />
       case "documents":
         return <DocumentsPage focus={docFocus} onClearFocus={() => setDocFocus(null)} />
       case "admin":

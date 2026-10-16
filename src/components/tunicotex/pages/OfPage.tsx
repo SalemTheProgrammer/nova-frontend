@@ -5,6 +5,7 @@ import { Card, Page, Select, TextInput } from "@/components/shared/primitives"
 import { PhasePipeline } from "@/components/tunicotex/PhasePipeline"
 import { RapportActions } from "@/components/tunicotex/RapportActions"
 import { Chargement, ErreurDivatex, Vide } from "@/components/tunicotex/EtatsDonnees"
+import { useDebounce } from "@/lib/useDebounce"
 import { useResource } from "@/lib/useResource"
 import {
   formatDateFr,
@@ -20,15 +21,6 @@ const pct = (f: number): string => `${Math.round(f * 100)} %`
 function messageErreur(erreur: string | null): string | undefined {
   if (!erreur || /DIVA injoignable/i.test(erreur)) return undefined
   return erreur
-}
-
-function useDebounce<T>(valeur: T, delaiMs: number): T {
-  const [v, setV] = useState(valeur)
-  useEffect(() => {
-    const t = setTimeout(() => setV(valeur), delaiMs)
-    return () => clearTimeout(t)
-  }, [valeur, delaiMs])
-  return v
 }
 
 function BadgeRisque({ risque }: { risque: OFRisque | undefined }) {

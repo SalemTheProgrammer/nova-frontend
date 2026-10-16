@@ -264,6 +264,15 @@ export const tunicotexApi = {
     )
     telecharger(blob, filename)
   },
+  /** PDF du rapport en mémoire (aperçu), sans le télécharger. */
+  apercuRapport: async (type: string, params: ParametresRapport = {}): Promise<Blob> =>
+    (
+      await requestFile(
+        "GET",
+        `/tunicotex/rapports/${encodeURIComponent(type)}.pdf${qs({ ...params })}`,
+        `rapport-${type}.pdf`,
+      )
+    ).blob,
   envoyerRapport: (type: string, corps: EnvoiRapport) =>
     request<EnvoiRapportReponse>(
       "POST",

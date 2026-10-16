@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { ChevronDown, ChevronRight, Search } from "lucide-react"
 import { Card, Page, Select, TextInput } from "@/components/shared/primitives"
 import { RapportActions } from "@/components/tunicotex/RapportActions"
 import { Chargement, ErreurDivatex, Vide } from "@/components/tunicotex/EtatsDonnees"
 import { messageErreur, pct } from "@/components/tunicotex/format"
+import { useDebounce } from "@/lib/useDebounce"
 import { useResource } from "@/lib/useResource"
 import {
   formatDateFr,
@@ -18,15 +19,6 @@ import { cn } from "@/lib/utils"
 const HORIZONS = [7, 14, 30]
 const SEUIL_REPLIE = 20
 const SANS_CLIENT = "Client inconnu"
-
-function useDebounce<T>(valeur: T, delaiMs: number): T {
-  const [v, setV] = useState(valeur)
-  useEffect(() => {
-    const t = setTimeout(() => setV(valeur), delaiMs)
-    return () => clearTimeout(t)
-  }, [valeur, delaiMs])
-  return v
-}
 
 function libelleJours(r: OFRisque): string {
   if (r.statut === "en_retard") return `${r.jours} j de retard`

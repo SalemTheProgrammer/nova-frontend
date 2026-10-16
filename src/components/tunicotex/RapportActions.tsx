@@ -30,10 +30,12 @@ export function RapportActions({
   type,
   parametres,
   libelle,
+  desactive = false,
 }: {
   type: string
   parametres: ParametresRapport
   libelle?: string
+  desactive?: boolean
 }) {
   const toast = useToast()
   const [ouvert, setOuvert] = useState(false)
@@ -87,11 +89,11 @@ export function RapportActions({
   return (
     <>
       <div className="flex items-center gap-2">
-        <Button variant="outline" onClick={telecharger} disabled={occupe}>
+        <Button variant="outline" onClick={telecharger} disabled={occupe || desactive}>
           <Download className="size-4" />
           PDF
         </Button>
-        <Button variant="outline" onClick={ouvrir}>
+        <Button variant="outline" onClick={ouvrir} disabled={desactive}>
           <Send className="size-4" />
           Envoyer sur WhatsApp
         </Button>
