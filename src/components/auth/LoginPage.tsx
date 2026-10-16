@@ -143,7 +143,7 @@ export function LoginPage() {
   const [erreur, setErreur] = useState<string | null>(null)
   const [chargement, setChargement] = useState(false)
   useEffect(() => {
-    document.title = "Connexion — Nova"
+    document.title = "Connexion — Nova Opsis · Tunicotex"
   }, [])
 
   async function demanderCode(e?: FormEvent) {
@@ -193,7 +193,10 @@ export function LoginPage() {
     <div className="flex h-dvh w-full overflow-hidden bg-background">
       {/* Formulaire */}
       <div className="flex h-full w-full flex-col justify-between overflow-y-auto p-6 sm:p-10 lg:w-1/2 lg:p-14">
-        <img src="/r.png" alt="Nova" className="h-10 w-auto self-start object-contain" />
+        <div className="flex items-center gap-3 self-start">
+          <img src="/r.png" alt="Nova" className="h-10 w-auto object-contain" />
+          <span className="text-sm font-medium text-muted-foreground">Nova Opsis · Tunicotex</span>
+        </div>
 
         <div className="my-auto w-full max-w-md py-8">
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Connexion à Nova</h1>
@@ -308,13 +311,23 @@ export function LoginPage() {
 
       {/* Visuel */}
       <div className="relative hidden h-full w-1/2 flex-col justify-end overflow-hidden bg-zinc-900 p-12 lg:flex">
-        <img
-          src="/login-illustration.jpg"
-          alt="Atelier de confection"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-        <div className="pointer-events-none absolute inset-0 bg-black/45" />
+        <svg
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 h-full w-full text-white/10"
+        >
+          <defs>
+            <pattern id="maille" width="28" height="28" patternUnits="userSpaceOnUse">
+              <path d="M0 14 L14 0 L28 14 L14 28 Z" fill="none" stroke="currentColor" strokeWidth="1" />
+              <path d="M14 0 V28 M0 14 H28" stroke="currentColor" strokeWidth="0.5" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#maille)" />
+        </svg>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
         <div className="relative z-10 max-w-md text-white">
+          <p className="mb-3 text-sm font-medium uppercase tracking-widest text-white/60">
+            Nova Opsis · Tunicotex
+          </p>
           <p className="text-2xl font-semibold leading-snug">Pilotage de la production de l'atelier.</p>
           <p className="mt-2 text-base text-white/80">
             Rendement des chaînes, effectif, ordres de fabrication et livraisons, au même endroit.
