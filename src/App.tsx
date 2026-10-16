@@ -8,6 +8,7 @@ import { EnConstruction } from "@/components/shared/EnConstruction"
 import { LoginPage } from "@/components/auth/LoginPage"
 import { AdminUsersPage } from "@/components/admin/AdminUsersPage"
 import { AtelierPage } from "@/components/tunicotex/pages/AtelierPage"
+import { CommandesPage } from "@/components/tunicotex/pages/CommandesPage"
 import { ChainesPage } from "@/components/tunicotex/pages/ChainesPage"
 import { OfPage } from "@/components/tunicotex/pages/OfPage"
 import { OperateursPage } from "@/components/tunicotex/pages/OperateursPage"
@@ -78,6 +79,7 @@ function AppContent({ view }: { view: NavView }) {
       case "operateurs":
         return <OperateursPage />
       case "commandes":
+        return <CommandesPage />
       case "rapports":
         return <EnConstruction />
       case "documents":
