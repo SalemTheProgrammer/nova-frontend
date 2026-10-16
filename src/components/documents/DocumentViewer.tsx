@@ -1,16 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Document, Page, pdfjs } from "react-pdf"
+import { Document, Page } from "react-pdf"
+import "@/lib/pdfWorker"
 import { ArrowLeft, ChevronLeft, ChevronRight, FileText, Highlighter } from "lucide-react"
 import { documentsApi } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import type { DocumentPassage } from "@/lib/types"
 import "react-pdf/dist/Page/TextLayer.css"
 import "react-pdf/dist/Page/AnnotationLayer.css"
-
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url,
-).toString()
 
 /** Normalise un texte pour comparer l'extraction pypdf (index) et pdf.js (viewer). */
 function normaliser(texte: string): string {

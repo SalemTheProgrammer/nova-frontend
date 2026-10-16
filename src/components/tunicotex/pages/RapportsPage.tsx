@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import { Document, Page, pdfjs } from "react-pdf"
+import { Document, Page } from "react-pdf"
+import "@/lib/pdfWorker"
 import { Eye, Search, X } from "lucide-react"
 import {
   Button,
@@ -14,12 +15,6 @@ import { useReference } from "@/components/tunicotex/useReference"
 import { useDebounce } from "@/lib/useDebounce"
 import { useResource } from "@/lib/useResource"
 import { tunicotexApi, type OFResume, type ParametresRapport } from "@/lib/tunicotex"
-
-// Même worker que DocumentViewer.
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url,
-).toString()
 
 const PERIODE_MAX_JOURS = 31
 const JOUR_MS = 86_400_000
@@ -99,17 +94,20 @@ function RechercheOf({
   const [saisie, setSaisie] = useState("")
   const q = useDebounce(saisie.trim(), 300)
   const resultats = useResource(
-    () => (q ? tunicotexApi.rechercherOf(q) : Promise.resolve([] as OFResume[])),
+    async () => ({ q, items: q ? await tunicotexApi.rechercherOf(q) : ([] as OFResume[]) }),
     [q],
   )
-  const liste = (resultats.data ?? []).slice(0, 8)
+  // Seuls les résultats de la requête courante comptent (jamais ceux d'une saisie précédente).
+  const actuels =
+    !resultats.loading && !resultats.error && resultats.data?.q === q ? resultats.data.items : null
+  const liste = (actuels ?? []).slice(0, 8)
 
   useEffect(() => {
     // Un seul résultat pour la saisie courante : il est choisi d'office.
-    if (!of && q && q === saisie.trim() && !resultats.loading && resultats.data?.length === 1) {
-      onChange(resultats.data[0])
+    if (!of && q && q === saisie.trim() && actuels?.length === 1) {
+      onChange(actuels[0])
     }
-  }, [of, q, saisie, resultats.loading, resultats.data, onChange])
+  }, [of, q, saisie, actuels, onChange])
 
   const libelleChamp = obligatoire ? "OF (obligatoire)" : "OF (facultatif)"
 
@@ -149,7 +147,7 @@ function RechercheOf({
           onChange={(e) => setSaisie(e.target.value)}
         />
       </div>
-      {q && !resultats.loading && liste.length === 0 && (
+      {q && !resultats.loading && (resultats.error || (actuels && liste.length === 0)) && (
         <p className="mt-1 text-xs text-muted-foreground">
           {resultats.error ? "Recherche indisponible." : "Aucun OF trouvé."}
         </p>
@@ -236,9 +234,11 @@ function ApercuPremierePage({
           {blob && (
             <Document
               file={blob}
-              onLoadError={() => setEtat("erreur")}
+              onLoadError={() => {
+                setBlob(null)
+                setEtat("erreur")
+              }}
               loading={<p className="text-sm text-muted-foreground">Ouverture…</p>}
-              error={<p className="text-sm text-muted-foreground">Aperçu indisponible</p>}
               className="flex justify-center"
             >
               <Page
