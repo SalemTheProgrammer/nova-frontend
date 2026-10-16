@@ -22,7 +22,6 @@ import { useReference } from "@/components/tunicotex/useReference"
 import { aiChatBus } from "@/lib/aiChatBus"
 import { useResource } from "@/lib/useResource"
 import {
-  estErreurDivatex,
   formatDateFr,
   tunicotexApi,
   type ProductionLigne,
@@ -40,9 +39,9 @@ function sousObjectif(l: ProductionLigne): boolean {
   return l.objectif != null && l.objectif > 0 && l.sortie < l.objectif
 }
 
-function NoteObjectif({ l }: { l: ProductionLigne }) {
-  if (!l.objectif_perime || !l.objectif_date) return null
-  return <span className="ml-1 text-xs text-muted-foreground">objectif du {jjmm(l.objectif_date)}</span>
+function messageErreur(erreur: string | null): string | undefined {
+  if (!erreur || /DIVA injoignable/i.test(erreur)) return undefined
+  return erreur
 }
 
 function ListeClassement({ titre, lignes }: { titre: string; lignes: ProductionLigne[] }) {
@@ -59,7 +58,6 @@ function ListeClassement({ titre, lignes }: { titre: string; lignes: ProductionL
               <span className="shrink-0 tabular-nums text-muted-foreground">
                 {l.sortie}
                 {l.objectif != null && ` / ${l.objectif}`} · {pct(l.taux)}
-                <NoteObjectif l={l} />
               </span>
             </li>
           ))}
@@ -97,18 +95,25 @@ export function AtelierPage() {
     if (!donnees) return []
     const s = donnees.situation
     let sortie = s.sortie
+    let sortieCible = s.sortie_avec_objectif
     let objectif = s.objectif
     let taux = s.taux
     let rendement = s.rendement_moyen
     let sous = s.lignes_sous_objectif.length
     if (groupe) {
-      sortie = lignes.reduce((a, l) => a + l.sortie, 0)
-      objectif = lignes.reduce((a, l) => a + (l.objectif ?? 0), 0)
-      taux = objectif > 0 ? sortie / objectif : null
+      const ciblees = lignes.filter(
+        (l) => l.ligne.nature === "confection" && l.objectif != null && l.a_des_lectures,
+      )
+      sortie = lignes
+        .filter((l) => l.ligne.nature === "confection")
+        .reduce((a, l) => a + l.sortie, 0)
+      sortieCible = ciblees.reduce((a, l) => a + l.sortie, 0)
+      objectif = ciblees.reduce((a, l) => a + (l.objectif ?? 0), 0)
+      taux = objectif > 0 ? sortieCible / objectif : null
       const presence = lignes.reduce((a, l) => a + l.minutes_presence, 0)
       rendement =
         presence > 0 ? lignes.reduce((a, l) => a + l.minutes_produites, 0) / presence : null
-      sous = lignes.filter(sousObjectif).length
+      sous = ciblees.filter(sousObjectif).length
     }
     const suffixe = ref.calibre ? "" : " (estimé)"
     return [
@@ -119,6 +124,7 @@ export function AtelierPage() {
         valeur: taux == null ? null : Math.round(taux * 100),
         unite: taux == null ? undefined : "%",
         etat: taux == null ? "neutre" : taux >= 1 ? "ok" : "alerte",
+        note: objectif > 0 ? `${sortieCible} / ${objectif} (chaînes avec objectif)` : undefined,
       },
       {
         libelle: `Rendement moyen${suffixe}`,
@@ -130,6 +136,7 @@ export function AtelierPage() {
         libelle: "OF en retard",
         valeur: s.nb_of_en_retard,
         etat: s.nb_of_en_retard > 0 ? "alerte" : "ok",
+        note: groupe ? "tout l'atelier" : undefined,
       },
     ]
   }, [donnees, groupe, lignes, ref.calibre])
@@ -148,6 +155,7 @@ export function AtelierPage() {
   }, [avecLectures])
 
   const donneesBarres = avecLectures.map((l) => ({
+    id: l.ligne.id,
     nom: l.ligne.code || l.ligne.nom,
     sortie: l.sortie,
     objectif: l.objectif ?? 0,
@@ -207,11 +215,7 @@ export function AtelierPage() {
             ref.reload()
             void atelier.reload()
           }}
-          message={
-            estErreurDivatex(atelier.error) || /DIVA injoignable/i.test(atelier.error ?? "")
-              ? undefined
-              : (atelier.error ?? ref.error ?? undefined)
-          }
+          message={messageErreur(atelier.error ?? ref.error)}
         />
       ) : !donnees || !donnees.situation.a_des_lectures ? (
         <Vide raison="Aucune lecture DIVA ce jour-là." />
@@ -232,9 +236,9 @@ export function AtelierPage() {
                     <YAxis tick={{ fontSize: 11 }} width={40} />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="sortie" name="Sortie">
+                    <Bar dataKey="sortie" name="Sortie" fill={NEUTRE}>
                       {donneesBarres.map((d) => (
-                        <Cell key={d.nom} fill={d.alerte ? ROUGE : NEUTRE} />
+                        <Cell key={d.id} fill={d.alerte ? ROUGE : NEUTRE} />
                       ))}
                     </Bar>
                     <Bar dataKey="objectif" name="Objectif" fill={OBJECTIF} />
@@ -292,7 +296,10 @@ export function AtelierPage() {
               {retards.loading ? (
                 <Chargement />
               ) : retards.error ? (
-                <p className="text-sm text-destructive">{retards.error}</p>
+                <ErreurDivatex
+                  onRetry={() => void retards.reload()}
+                  message={messageErreur(retards.error)}
+                />
               ) : (retards.data ?? []).length === 0 ? (
                 <p className="text-sm text-muted-foreground">Aucun OF en retard.</p>
               ) : (

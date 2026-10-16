@@ -76,6 +76,8 @@ export interface SituationAtelier {
   jour: string
   sortie: number
   objectif: number
+  /** Σ sortie des chaînes de confection avec objectif et lectures (numérateur du taux). */
+  sortie_avec_objectif: number
   taux: number | null
   rendement_moyen: number | null
   lignes_sous_objectif: string[]
