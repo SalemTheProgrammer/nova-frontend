@@ -32,7 +32,18 @@ export function canAccessView(user: User | null, view: NavView): boolean {
  * tout appel réseau (garde de route), donc pas de dépendance à un fetch. */
 const CATEGORY_TOOLS: Record<string, string[]> = {
   Documents: ["rechercher_documents", "lister_documents_disponibles"],
-  "Atelier Tunicotex": [],
+  "Atelier Tunicotex": [
+    "situation_atelier",
+    "production_chaines",
+    "detail_chaine",
+    "rechercher_of",
+    "avancement_of",
+    "rendement_operateurs",
+    "fiche_operateur",
+    "commandes_a_risque",
+    "consulter_commande",
+    "rapport_pdf",
+  ],
 }
 
 /** Première vue accessible à cet utilisateur, dans un ordre de préférence

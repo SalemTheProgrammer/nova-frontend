@@ -34,6 +34,16 @@ const TOOL_LABEL: Record<string, string> = {
   aller_a_la_page: "Redirection",
   envoyer_rapport: "Envoi du bilan",
   envoyer_message: "Envoi du message",
+  situation_atelier: "Situation de l'atelier",
+  production_chaines: "Production des chaînes",
+  detail_chaine: "Détail de la chaîne",
+  rechercher_of: "Recherche d'OF",
+  avancement_of: "Avancement de l'OF",
+  rendement_operateurs: "Rendement des opérateurs",
+  fiche_operateur: "Fiche opérateur",
+  commandes_a_risque: "Commandes à risque",
+  consulter_commande: "Consultation de commande",
+  rapport_pdf: "Rapport PDF",
 }
 
 /** Outils qui MODIFIENT réellement l'atelier ou envoient quelque chose à
