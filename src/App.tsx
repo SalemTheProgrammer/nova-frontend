@@ -9,6 +9,7 @@ import { LoginPage } from "@/components/auth/LoginPage"
 import { AdminUsersPage } from "@/components/admin/AdminUsersPage"
 import { AtelierPage } from "@/components/tunicotex/pages/AtelierPage"
 import { ChainesPage } from "@/components/tunicotex/pages/ChainesPage"
+import { OfPage } from "@/components/tunicotex/pages/OfPage"
 import { aiChatBus } from "@/lib/aiChatBus"
 import { useAuth } from "@/lib/auth"
 import { canAccessView, firstAccessibleView } from "@/lib/permissions"
@@ -72,6 +73,7 @@ function AppContent({ view }: { view: NavView }) {
       case "chaines":
         return <ChainesPage />
       case "of":
+        return <OfPage />
       case "operateurs":
       case "commandes":
       case "rapports":
