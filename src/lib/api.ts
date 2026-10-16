@@ -51,11 +51,19 @@ export interface ApiError {
   error: { code: string; message: string; details?: Record<string, unknown> }
 }
 
-export async function request<T>(
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<T> {
+/** Erreur HTTP typée : `status` et `code` (ex. `divatex_indisponible` pour un 503). */
+export class ApiRequestError extends Error {
+  status: number
+  code: string | null
+  constructor(message: string, status: number, code: string | null = null) {
+    super(message)
+    this.name = "ApiRequestError"
+    this.status = status
+    this.code = code
+  }
+}
+
+async function fetchOk(method: string, path: string, body?: unknown): Promise<Response> {
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers: {
@@ -69,44 +77,53 @@ export async function request<T>(
   if (!res.ok) {
     handleUnauthorized(res.status)
     let message = `Requête échouée (${res.status})`
+    let code: string | null = null
     try {
-      const data = (await res.json()) as ApiError & { detail?: string }
+      const data = (await res.json()) as Partial<ApiError> & { detail?: string }
       message = data.error?.message ?? data.detail ?? message
+      code = data.error?.code ?? null
     } catch {
       // no JSON body
     }
-    throw new Error(message)
+    throw new ApiRequestError(message, res.status, code)
   }
+  return res
+}
 
+export async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const res = await fetchOk(method, path, body)
   if (res.status === 204) return undefined as T
   return (await res.json()) as T
 }
 
 /** Comme `request`, mais renvoie le corps brut (ex. PDF à télécharger). */
 export async function requestBlob(method: string, path: string, body?: unknown): Promise<Blob> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      "X-API-Key": API_KEY,
-      ...authHeaders(),
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  })
+  return (await fetchOk(method, path, body)).blob()
+}
 
-  if (!res.ok) {
-    handleUnauthorized(res.status)
-    let message = `Requête échouée (${res.status})`
+/** Comme `requestBlob`, avec le nom de fichier de l'en-tête Content-Disposition. */
+export async function requestFile(
+  method: string,
+  path: string,
+  fallbackName: string,
+  body?: unknown,
+): Promise<{ blob: Blob; filename: string }> {
+  const res = await fetchOk(method, path, body)
+  const disposition = res.headers.get("Content-Disposition") ?? ""
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition)
+  let filename = fallbackName
+  if (match) {
     try {
-      const data = (await res.json()) as ApiError & { detail?: string }
-      message = data.error?.message ?? data.detail ?? message
+      filename = decodeURIComponent(match[1])
     } catch {
-      // no JSON body
+      filename = match[1]
     }
-    throw new Error(message)
   }
-
-  return res.blob()
+  return { blob: await res.blob(), filename }
 }
 
 async function upload<T>(path: string, formData: FormData): Promise<T> {
