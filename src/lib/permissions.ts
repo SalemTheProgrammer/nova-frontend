@@ -50,9 +50,9 @@ const CATEGORY_TOOLS: Record<string, string[]> = {
  * raisonnable. */
 const ORDRE_REPLI: NavView[] = ["atelier", "documents"]
 
-export function firstAccessibleView(user: User | null): NavView {
+export function firstAccessibleView(user: User | null): NavView | null {
   for (const view of ORDRE_REPLI) {
     if (canAccessView(user, view)) return view
   }
-  return "atelier"
+  return null
 }

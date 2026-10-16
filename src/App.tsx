@@ -92,16 +92,28 @@ function AppContent({ view }: { view: NavView }) {
   )
 }
 
+/** Utilisateur sans aucun outil activé : pas de redirection possible. */
+function AucunAcces() {
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-background p-6 text-center text-sm text-muted-foreground">
+      Aucun accès — demandez à l'administrateur d'activer vos outils.
+    </div>
+  )
+}
+
 function ViewRoute() {
   const { view } = useParams<{ view: string }>()
   const { user } = useAuth()
-  if (!isNavView(view)) return <Navigate to={`/app/${firstAccessibleView(user)}`} replace />
+  const repli = firstAccessibleView(user)
+  if (!isNavView(view)) {
+    return repli ? <Navigate to={`/app/${repli}`} replace /> : <AucunAcces />
+  }
   // Garde-fou pour un lien direct/marque-page vers une page hors du périmètre
   // de l'utilisateur — la nav (Sidebar) cache déjà ces entrées, mais l'URL
   // reste tapable à la main ; le backend refuserait de toute façon les appels
   // API de cette page (voir app/core/access.py), donc autant rediriger direct.
   if (!canAccessView(user, view)) {
-    return <Navigate to={`/app/${firstAccessibleView(user)}`} replace />
+    return repli ? <Navigate to={`/app/${repli}`} replace /> : <AucunAcces />
   }
   return <AppContent view={view} />
 }
