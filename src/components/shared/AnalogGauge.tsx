@@ -1,6 +1,5 @@
 import { useMemo } from "react"
 import { cn } from "@/lib/utils"
-import type { DashboardResume } from "@/lib/types"
 
 export interface RangeSegment {
   start: number
@@ -173,7 +172,7 @@ export function AnalogGauge({
       )}
       title={label ? `${label} : ${clampedVal.toFixed(1)}%` : undefined}
     >
-      {/* Label centré unique pour la jauge (ex: TRS, PERFORMANCE, etc.) */}
+      {/* Label centré unique pour la jauge (ex: RENDEMENT, etc.) */}
       <h4 className="w-full text-center text-xs sm:text-[13px] font-bold tracking-wider uppercase text-foreground truncate pt-0.5 pb-0.5">
         {displayCaption}
       </h4>
@@ -267,68 +266,6 @@ export function AnalogGauge({
           <circle cx={cx} cy={cy} r={2.5} fill="#ffedd5" />
         </svg>
       </div>
-    </div>
-  )
-}
-
-// -----------------------------------------------------------------------------
-// Groupe des 4 Jauges Alignées : TRS, Disponibilité, Performance, TRG/TRE
-// -----------------------------------------------------------------------------
-
-function parsePct(v: string | number | null | undefined): number {
-  if (v == null) return 0
-  const n = typeof v === "number" ? v : parseFloat(v)
-  if (isNaN(n)) return 0
-  return n <= 1 ? Math.round(n * 1000) / 10 : Math.round(n * 10) / 10
-}
-
-interface AnalogGaugesRowProps {
-  resume: DashboardResume | null
-  className?: string
-}
-
-export function AnalogGaugesRow({ resume, className }: AnalogGaugesRowProps) {
-  // 1. TRS Global
-  const trsVal = parsePct(resume?.trs_global ?? resume?.trs_detail?.trs)
-
-  // 2. Disponibilité Opérationnelle (DO)
-  const dispoVal = parsePct(resume?.disponibilite ?? resume?.trs_detail?.do)
-
-  // 3. Performance (TP)
-  const perfVal = parsePct(resume?.performance ?? resume?.trs_detail?.tp)
-
-  // 4. TRG & TRE (AFNOR NF E60-182)
-  // TRG = TRS * Taux de charge
-  // TRE = TRG * Taux d'engagement
-  const tauxCharge = resume?.taux_charge ? parseFloat(resume.taux_charge) : 0.95
-  const tauxEngage = resume?.taux_engagement ? parseFloat(resume.taux_engagement) : 0.88
-
-  const trgVal =
-    resume?.trs_detail?.trg != null
-      ? parsePct(resume.trs_detail.trg)
-      : Math.round(trsVal * (tauxCharge <= 1 ? tauxCharge : tauxCharge / 100) * 10) / 10
-
-  const treVal =
-    resume?.trs_detail?.tre != null
-      ? parsePct(resume.trs_detail.tre)
-      : Math.round(trgVal * (tauxEngage <= 1 ? tauxEngage : tauxEngage / 100) * 10) / 10
-
-  return (
-    <div className={cn("grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-2.5 xl:gap-3 items-stretch", className)}>
-      {/* 1. Jauge TRS */}
-      <AnalogGauge value={trsVal} label="TRS" caption="TRS" />
-
-      {/* 2. Jauge Disponibilité */}
-      <AnalogGauge value={dispoVal} label="Disponibilité" caption="DISPONIBILITÉ" />
-
-      {/* 3. Jauge Performance */}
-      <AnalogGauge value={perfVal} label="Performance" caption="PERFORMANCE" />
-
-      {/* 4. Jauge TRG */}
-      <AnalogGauge value={trgVal} label="TRG" caption="TRG" />
-
-      {/* 5. Jauge TRE */}
-      <AnalogGauge value={treVal} label="TRE" caption="TRE" />
     </div>
   )
 }

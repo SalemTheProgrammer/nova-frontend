@@ -8,7 +8,7 @@ import {
   type KeyboardEvent,
 } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, ExternalLink, Eye, Factory, Loader2, MessageCircle, Phone, RotateCcw, ShieldCheck } from "lucide-react"
+import { ArrowLeft, Loader2, MessageCircle, Phone, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -131,13 +131,6 @@ function OtpInput({
   )
 }
 
-/** Panneau de l'usine simulée (badges opérateurs). En prod il est servi par
- * nginx sous /simulateur/ ; en dev, le simulateur tourne sur le port 8090.
- * `VITE_SIMULATOR_URL` permet de viser une autre adresse. */
-const SIMULATEUR_URL =
-  import.meta.env.VITE_SIMULATOR_URL ??
-  (import.meta.env.DEV ? "http://localhost:8090/" : "/simulateur/")
-
 const BOUTON_PRINCIPAL =
   "h-12 w-full rounded-lg bg-foreground text-base font-medium text-background transition-colors hover:bg-foreground/90 active:scale-[0.99]"
 
@@ -149,54 +142,9 @@ export function LoginPage() {
   const [code, setCode] = useState("")
   const [erreur, setErreur] = useState<string | null>(null)
   const [chargement, setChargement] = useState(false)
-  const [demoDisponible, setDemoDisponible] = useState(false)
-  const [resetEtat, setResetEtat] = useState<"repos" | "cours" | "fait" | "erreur">("repos")
-
   useEffect(() => {
-    document.title = "Connexion — Nova MES"
+    document.title = "Connexion — Nova"
   }, [])
-
-  async function reinitialiserUsine() {
-    if (resetEtat === "cours") return
-    setResetEtat("cours")
-    try {
-      await authApi.resetUsine()
-      setResetEtat("fait")
-      setTimeout(() => setResetEtat("repos"), 6000)
-    } catch {
-      setResetEtat("erreur")
-      setTimeout(() => setResetEtat("repos"), 6000)
-    }
-  }
-
-  // Le mode démonstration est piloté par le backend (DEMO_LOGIN_ENABLED) : on
-  // n'affiche le bouton que s'il répond, pour ne pas promettre un accès fermé.
-  useEffect(() => {
-    let annule = false
-    authApi
-      .demoDisponible()
-      .then((dispo) => {
-        if (!annule) setDemoDisponible(dispo)
-      })
-      .catch(() => {})
-    return () => {
-      annule = true
-    }
-  }, [])
-
-  async function entrerEnDemo() {
-    setErreur(null)
-    setChargement(true)
-    try {
-      const { token, user } = await authApi.demo()
-      login(token, user)
-      navigate("/app/dashboard", { replace: true })
-    } catch (err) {
-      setErreur(err instanceof Error ? err.message : "Le mode démonstration est indisponible.")
-    } finally {
-      setChargement(false)
-    }
-  }
 
   async function demanderCode(e?: FormEvent) {
     if (e) e.preventDefault()
@@ -227,7 +175,7 @@ export function LoginPage() {
     try {
       const { token, user } = await authApi.verifyCode(telephone.trim(), codeFinal)
       login(token, user)
-      navigate("/app/dashboard", { replace: true })
+      navigate("/app/atelier", { replace: true })
     } catch (err) {
       setErreur(err instanceof Error ? err.message : "Code incorrect ou expiré.")
     } finally {
@@ -243,34 +191,6 @@ export function LoginPage() {
 
   return (
     <div className="flex h-dvh w-full overflow-hidden bg-background">
-      {/* Bouton de démonstration : dans le coin, réinitialise l'usine en un clic.
-          Visible uniquement quand le backend a le mode démo activé. */}
-      {demoDisponible && (
-        <button
-          type="button"
-          onClick={reinitialiserUsine}
-          disabled={resetEtat === "cours"}
-          title="Prépare un état de démonstration : usine relancée, coûts réalistes, arrêts pour le Pareto"
-          className={cn(
-            "fixed right-4 top-4 z-50 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm transition-colors",
-            resetEtat === "fait"
-              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
-              : resetEtat === "erreur"
-                ? "border-destructive/40 bg-destructive/10 text-destructive"
-                : "border-border bg-background text-foreground hover:bg-accent",
-          )}
-        >
-          <RotateCcw className={cn("size-4", resetEtat === "cours" && "animate-spin")} />
-          {resetEtat === "cours"
-            ? "Réinitialisation…"
-            : resetEtat === "fait"
-              ? "Usine prête ✓"
-              : resetEtat === "erreur"
-                ? "Échec — réessayer"
-                : "Réinitialiser l'usine"}
-        </button>
-      )}
-
       {/* Formulaire */}
       <div className="flex h-full w-full flex-col justify-between overflow-y-auto p-6 sm:p-10 lg:w-1/2 lg:p-14">
         <img src="/r.png" alt="Nova" className="h-10 w-auto self-start object-contain" />
@@ -321,25 +241,6 @@ export function LoginPage() {
                 )}
               </Button>
 
-              {/* Accès démonstration : une session lecture seule, sans code.
-                  Le bouton n'apparaît que si le backend l'autorise
-                  (DEMO_LOGIN_ENABLED) — voir entrerEnDemo(). */}
-              {demoDisponible && (
-                <div className="space-y-2 border-t border-border pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => void entrerEnDemo()}
-                    disabled={chargement}
-                  >
-                    <Eye className="mr-2 size-4" /> Entrer en mode démonstration
-                  </Button>
-                  <p className="text-center text-xs text-muted-foreground">
-                    Sans code : consultation seule, aucune commande machine.
-                  </p>
-                </div>
-              )}
             </form>
           ) : (
             <form
@@ -399,18 +300,6 @@ export function LoginPage() {
         </div>
 
         <div className="space-y-3">
-          {/* Panneau de l'usine simulée : badges opérateurs, cartes d'arrêt,
-              incidents. Protégé par son propre mot de passe (nginx). */}
-          <a
-            href={SIMULATEUR_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm font-medium text-foreground underline-offset-4 hover:underline"
-          >
-            <Factory className="size-4" />
-            Simulateur d'atelier — badges opérateurs
-            <ExternalLink className="size-3.5 text-muted-foreground" />
-          </a>
           <p className="text-sm text-muted-foreground">
             Pas encore d'accès ? Demandez-le à votre responsable d'atelier ou à l'administrateur Nova.
           </p>
@@ -421,14 +310,14 @@ export function LoginPage() {
       <div className="relative hidden h-full w-1/2 flex-col justify-end overflow-hidden bg-zinc-900 p-12 lg:flex">
         <img
           src="/login-illustration.jpg"
-          alt="Ligne de conditionnement pharmaceutique"
+          alt="Atelier de confection"
           className="absolute inset-0 h-full w-full object-cover"
         />
         <div className="pointer-events-none absolute inset-0 bg-black/45" />
         <div className="relative z-10 max-w-md text-white">
-          <p className="text-2xl font-semibold leading-snug">Supervision de production en temps réel.</p>
+          <p className="text-2xl font-semibold leading-snug">Pilotage de la production de l'atelier.</p>
           <p className="mt-2 text-base text-white/80">
-            TRS, arrêts, qualité et ordres de fabrication, alimentés directement par vos automates.
+            Rendement des chaînes, effectif, ordres de fabrication et livraisons, au même endroit.
           </p>
         </div>
       </div>

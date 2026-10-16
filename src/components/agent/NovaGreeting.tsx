@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { chatAccueil } from "@/lib/api"
+import { agentApi } from "@/lib/api"
 
 /** Vitesse de frappe simulée (ms par caractère). Rythme moyen : ni saccadé, ni lent. */
 const VITESSE_MS = 24
@@ -42,7 +42,7 @@ export function NovaGreeting({
   useEffect(() => {
     let annule = false
     const debut = Date.now()
-    chatAccueil(initial.current.threadId)
+    agentApi.accueil(initial.current.threadId)
       .then((r) => {
         // Adopté tout de suite : le prochain message de l'opérateur doit partir
         // dans CE thread, même s'il l'envoie avant la fin de la frappe.

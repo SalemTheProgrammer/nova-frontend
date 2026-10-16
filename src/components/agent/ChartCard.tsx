@@ -47,9 +47,9 @@ export function ChartCard({ artifact }: { artifact: AgentArtifact }) {
   if (!spec.series?.length) return null
 
   const multi = spec.series.length > 1
-  // Un pourcentage (TRS, taux qualité…) doit toujours s'afficher sur une
+  // Un pourcentage (rendement, taux…) doit toujours s'afficher sur une
   // échelle fixe 0-100 % : laisser Recharts auto-cadrer sur la plage des
-  // données exagère les petites valeurs (ex. un TRS réel de 2 % rempli tout
+  // données exagère les petites valeurs (ex. un rendement réel de 2 % rempli tout
   // le graphique et donne l'impression d'un pic, alors que c'est juste bas).
   const estPourcentage = spec.unit === "%"
   const axes = (

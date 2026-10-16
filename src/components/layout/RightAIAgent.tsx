@@ -7,15 +7,12 @@ import {
   Trash2,
   Volume2,
   VolumeX,
-  Wifi,
-  WifiOff,
   X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { aiChatBus } from "@/lib/aiChatBus"
 import { useAgentChat } from "@/hooks/useAgentChat"
 import { useVoice } from "@/hooks/useVoice"
-import { useWebSocket } from "@/hooks/useWebSocket"
 import { AgentTurnView } from "@/components/agent/AgentMessage"
 import { NovaGreeting } from "@/components/agent/NovaGreeting"
 import { NovaLogo } from "@/components/NovaLogo"
@@ -23,17 +20,12 @@ import type { NavView } from "@/components/Sidebar"
 import type { DocumentPassage } from "@/lib/types"
 
 const VALID_VIEWS: readonly string[] = [
-  "dashboard",
-  "afnor",
-  "arrets",
-  "qualite",
-  "maintenance",
-  "stock",
-  "ordres",
-  "articles",
-  "matieres",
-  "lignes",
-  "fournisseurs",
+  "atelier",
+  "chaines",
+  "of",
+  "operateurs",
+  "commandes",
+  "rapports",
   "documents",
 ]
 
@@ -52,7 +44,6 @@ export function RightAIAgent({
   floating?: boolean
   navigationEnabled?: boolean
 }) {
-  const { connected } = useWebSocket()
   const [input, setInput] = useState("")
   const [ttsEnabled, setTtsEnabled] = useState(false)
   const ttsEnabledRef = useRef(ttsEnabled)
@@ -151,19 +142,8 @@ export function RightAIAgent({
               <h2 className="text-sm font-semibold tracking-tight text-foreground">
                 Assistant Nova
               </h2>
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium",
-                  connected
-                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                    : "bg-muted text-muted-foreground",
-                )}
-              >
-                {connected ? <Wifi className="size-3" /> : <WifiOff className="size-3" />}
-                {connected ? "En ligne" : "Hors ligne"}
-              </span>
             </div>
-            <p className="text-xs text-muted-foreground">Copilote IA & supervision atelier</p>
+            <p className="text-xs text-muted-foreground">Copilote IA pour l'atelier</p>
           </div>
         </div>
 

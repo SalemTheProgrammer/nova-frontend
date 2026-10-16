@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { deleteChatThread, getChatHistory, streamChatMessage } from "@/lib/api"
+import { agentApi } from "@/lib/api"
 import { chatSession } from "@/lib/chatSession"
 import type { AgentArtifact, AgentStreamEvent } from "@/lib/types"
 
@@ -50,7 +50,7 @@ export function useAgentChat(
     const savedThreadId = threadId.current
     if (!savedThreadId) return
     let cancelled = false
-    getChatHistory(savedThreadId)
+    agentApi.history(savedThreadId)
       .then((r) => {
         if (!cancelled && r.turns.length > 0) setTurns(r.turns)
       })
@@ -136,7 +136,7 @@ export function useAgentChat(
       }
 
       try {
-        await streamChatMessage(trimmed, threadId.current, handleEvent, undefined, mode)
+        await agentApi.stream(trimmed, threadId.current, handleEvent, undefined, mode)
       } catch (err) {
         handleEvent({
           type: "error",
@@ -156,7 +156,7 @@ export function useAgentChat(
     chatSession.clear()
     if (currentThreadId) {
       try {
-        await deleteChatThread(currentThreadId)
+        await agentApi.clear(currentThreadId)
       } catch {
         // Le thread n'existe peut-être déjà plus côté serveur : sans
         // conséquence, l'état local est déjà réinitialisé.

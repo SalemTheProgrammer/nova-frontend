@@ -1,21 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react"
 import { Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom"
 import { AppShell } from "@/components/layout/AppShell"
-import { WebSocketProvider } from "@/hooks/useWebSocket"
 import type { NavView } from "@/components/Sidebar"
 import type { DocumentFocus, DocumentPassage } from "@/lib/types"
-import { DocumentsPage } from "@/components/dashboard/DocumentsPage"
-import { MesDashboardPage } from "@/components/dashboard/MesDashboardPage"
-import { ArretsPage } from "@/components/dashboard/ArretsPage"
-import { QualitePage } from "@/components/dashboard/QualitePage"
-import { MaintenancePage } from "@/components/dashboard/MaintenancePage"
-import { StockPage } from "@/components/dashboard/StockPage"
-import { OrdresPage } from "@/components/dashboard/OrdresPage"
-import { ArticlesPage } from "@/components/dashboard/ArticlesPage"
-import { MatieresPage } from "@/components/dashboard/MatieresPage"
-import { LignesPage } from "@/components/dashboard/LignesPage"
-import { FournisseursPage } from "@/components/dashboard/FournisseursPage"
-import { AfnorScreen } from "@/components/dashboard/AfnorScreen"
+import { DocumentsPage } from "@/components/shared/DocumentsPage"
+import { EnConstruction } from "@/components/shared/EnConstruction"
 import { LoginPage } from "@/components/auth/LoginPage"
 import { AdminUsersPage } from "@/components/admin/AdminUsersPage"
 import { aiChatBus } from "@/lib/aiChatBus"
@@ -23,35 +12,25 @@ import { useAuth } from "@/lib/auth"
 import { canAccessView, firstAccessibleView } from "@/lib/permissions"
 
 const NAV_VIEWS: NavView[] = [
-  "dashboard",
-  "afnor",
-  "arrets",
-  "qualite",
-  "maintenance",
-  "stock",
-  "ordres",
-  "articles",
-  "matieres",
-  "lignes",
-  "fournisseurs",
+  "atelier",
+  "chaines",
+  "of",
+  "operateurs",
+  "commandes",
+  "rapports",
   "documents",
   "admin",
 ]
 
 export const VIEW_TITLES: Record<NavView, string> = {
-  dashboard: "Tableau de bord MES",
-  afnor: "Diagramme de Gantt",
-  arrets: "Journal des Arrêts",
-  qualite: "Contrôle Qualité & Rejets",
-  maintenance: "Maintenance & Interventions",
-  stock: "Gestion des Stocks",
-  ordres: "Ordres de Fabrication",
-  articles: "Catalogue Articles & Recettes",
-  matieres: "Matières Premières",
-  lignes: "Lignes de Production",
-  fournisseurs: "Fournisseurs",
-  documents: "Documentation Technique & BPF",
-  admin: "Administration & Sécurité",
+  atelier: "Tableau de bord",
+  chaines: "Chaînes",
+  of: "Ordres de fabrication",
+  operateurs: "Opérateurs",
+  commandes: "Commandes & livraisons",
+  rapports: "Rapports",
+  documents: "Documentation",
+  admin: "Administration",
 }
 
 function isNavView(value: string | undefined): value is NavView {
@@ -61,7 +40,6 @@ function isNavView(value: string | undefined): value is NavView {
 function AppContent({ view }: { view: NavView }) {
   const navigate = useNavigate()
   const setView = (next: NavView) => navigate(`/app/${next}`)
-  const [ligneId, setLigneId] = useState<number | null>(null)
   const [docFocus, setDocFocus] = useState<DocumentFocus | null>(null)
   const [aiPanelOpen, setAiPanelOpen] = useState(false)
 
@@ -73,7 +51,7 @@ function AppContent({ view }: { view: NavView }) {
 
   // Met à jour le titre de l'onglet du navigateur
   useEffect(() => {
-    const titre = VIEW_TITLES[view] || "Supervision"
+    const titre = VIEW_TITLES[view] || "Nova"
     document.title = `${titre} — Nova`
   }, [view])
 
@@ -85,37 +63,15 @@ function AppContent({ view }: { view: NavView }) {
     setView("documents")
   }
 
-  /** Ouvre le panneau Nova et lui envoie directement un message préconstruit
-   * (ex. « Créer avec Nova » sur la page Ordres). */
-  function askNova(message: string) {
-    setAiPanelOpen(true)
-    aiChatBus.emit(message)
-  }
-
   function renderView() {
     switch (view) {
-      case "dashboard":
-        return <MesDashboardPage ligneId={ligneId} onChangeLigne={setLigneId} />
-      case "afnor":
-        return <AfnorScreen />
-      case "arrets":
-        return <ArretsPage />
-      case "qualite":
-        return <QualitePage />
-      case "maintenance":
-        return <MaintenancePage />
-      case "stock":
-        return <StockPage />
-      case "ordres":
-        return <OrdresPage onAskNova={askNova} />
-      case "articles":
-        return <ArticlesPage />
-      case "matieres":
-        return <MatieresPage />
-      case "lignes":
-        return <LignesPage />
-      case "fournisseurs":
-        return <FournisseursPage />
+      case "atelier":
+      case "chaines":
+      case "of":
+      case "operateurs":
+      case "commandes":
+      case "rapports":
+        return <EnConstruction />
       case "documents":
         return <DocumentsPage focus={docFocus} onClearFocus={() => setDocFocus(null)} />
       case "admin":
@@ -124,26 +80,21 @@ function AppContent({ view }: { view: NavView }) {
   }
 
   return (
-    <WebSocketProvider>
-      <AppShell
-        view={view}
-        onChangeView={setView}
-        ligneId={ligneId}
-        onChangeLigne={setLigneId}
-        onDocumentsPassages={handleDocumentsPassages}
-        aiPanelOpen={aiPanelOpen}
-        onAiPanelOpenChange={setAiPanelOpen}
-      >
-        {renderView()}
-      </AppShell>
-    </WebSocketProvider>
+    <AppShell
+      view={view}
+      onChangeView={setView}
+      onDocumentsPassages={handleDocumentsPassages}
+      aiPanelOpen={aiPanelOpen}
+      onAiPanelOpenChange={setAiPanelOpen}
+    >
+      {renderView()}
+    </AppShell>
   )
 }
 
 function ViewRoute() {
   const { view } = useParams<{ view: string }>()
   const { user } = useAuth()
-  if (view === "trs") return <Navigate to="/app/afnor" replace />
   if (!isNavView(view)) return <Navigate to={`/app/${firstAccessibleView(user)}`} replace />
   // Garde-fou pour un lien direct/marque-page vers une page hors du périmètre
   // de l'utilisateur — la nav (Sidebar) cache déjà ces entrées, mais l'URL
@@ -179,7 +130,7 @@ function App() {
       <Route
         path="/login"
         element={
-          loading ? <AuthLoading /> : user ? <Navigate to="/app/dashboard" replace /> : <LoginPage />
+          loading ? <AuthLoading /> : user ? <Navigate to="/app/atelier" replace /> : <LoginPage />
         }
       />
       <Route path="/admin" element={<Navigate to="/app/admin" replace />} />
@@ -191,8 +142,8 @@ function App() {
           </RequireAuth>
         }
       />
-      <Route path="/" element={<Navigate to="/app/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
+      <Route path="/" element={<Navigate to="/app/atelier" replace />} />
+      <Route path="*" element={<Navigate to="/app/atelier" replace />} />
     </Routes>
   )
 }

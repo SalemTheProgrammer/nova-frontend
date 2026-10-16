@@ -17,7 +17,7 @@ import {
   Td,
   Th,
   TextInput,
-} from "@/components/dashboard/primitives"
+} from "@/components/shared/primitives"
 
 export function DocumentsPage({
   focus = null,
@@ -110,8 +110,8 @@ export function DocumentsPage({
 
   return (
     <Page
-      title="Documentation Technique & BPF"
-      description="Base documentaire (normes BPF/GMP, procédures, manuels machines, fiches techniques…) indexée pour le RAG de l'agent."
+      title="Documentation"
+      description="Base documentaire (procédures, manuels, fiches techniques…) consultée par l'assistant Nova."
       actions={
         <Button onClick={() => setOpen(true)}>
           <Upload className="size-4" /> Téléverser un PDF
@@ -253,14 +253,14 @@ export function DocumentsPage({
           <TextInput
             value={nom}
             onChange={(e) => setNom(e.target.value)}
-            placeholder="BPF Tunisie 2023, Manuel presse M-01…"
+            placeholder="Procédure de contrôle, Fiche technique…"
           />
         </Field>
         <Field label="Catégorie (optionnel)">
           <TextInput
             value={categorie}
             onChange={(e) => setCategorie(e.target.value)}
-            placeholder="Norme, Procédure, Manuel machine, Fiche technique…"
+            placeholder="Procédure, Manuel, Fiche technique…"
           />
         </Field>
         <Field label="Fichier PDF">

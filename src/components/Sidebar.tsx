@@ -1,43 +1,29 @@
 import { useEffect, useState } from "react"
 import {
-  Activity,
-  AlertTriangle,
   BookOpen,
   Check,
-  CalendarRange,
   ClipboardList,
   Factory,
-  FlaskConical,
+  FileText,
   LayoutDashboard,
   LogOut,
   Package,
-  ShieldCheck,
   Truck,
   UserCog,
-  Wifi,
-  WifiOff,
-  Wrench,
+  Users,
   X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { lignesApi } from "@/lib/api"
-import type { LigneProduction } from "@/lib/types"
-import { useWebSocket } from "@/hooks/useWebSocket"
 import { useAuth } from "@/lib/auth"
 import { canAccessView } from "@/lib/permissions"
 
 export type NavView =
-  | "dashboard"
-  | "afnor"
-  | "arrets"
-  | "qualite"
-  | "maintenance"
-  | "stock"
-  | "ordres"
-  | "articles"
-  | "matieres"
-  | "lignes"
-  | "fournisseurs"
+  | "atelier"
+  | "chaines"
+  | "of"
+  | "operateurs"
+  | "commandes"
+  | "rapports"
   | "documents"
   | "admin"
 
@@ -48,10 +34,10 @@ interface NavItem {
   icon: typeof LayoutDashboard
 }
 
-type DrawerCategory = "pilotage" | "analyse" | "ressources" | "lignes" | null
+type DrawerCategory = "production" | "commandes" | "ressources" | null
 
 interface CategoryConfig {
-  id: "pilotage" | "analyse" | "ressources"
+  id: "production" | "commandes" | "ressources"
   titre: string
   badge: string
   icon: typeof LayoutDashboard
@@ -60,98 +46,74 @@ interface CategoryConfig {
 
 const CATEGORIES: CategoryConfig[] = [
   {
-    id: "pilotage",
-    titre: "Pilotage d'Atelier",
-    badge: "Opérations",
-    icon: LayoutDashboard,
+    id: "production",
+    titre: "Production",
+    badge: "Atelier",
+    icon: Factory,
     items: [
       {
-        view: "dashboard",
+        view: "atelier",
         label: "Tableau de bord",
-        description: "Vue d'ensemble et KPIs de production en temps réel",
+        description: "Vue d'ensemble de la production du jour",
         icon: LayoutDashboard,
       },
       {
-        view: "ordres",
-        label: "Ordres de fabrication",
-        description: "Planification et état d'avancement des OFs",
-        icon: ClipboardList,
+        view: "chaines",
+        label: "Chaînes",
+        description: "Rendement et effectif par chaîne de montage",
+        icon: Factory,
+      },
+      {
+        view: "operateurs",
+        label: "Opérateurs",
+        description: "Effectif et affectation aux postes de travail",
+        icon: Users,
       },
     ],
   },
   {
-    id: "analyse",
-    titre: "Performance & Analyse",
-    badge: "Métriques",
-    icon: Activity,
+    id: "commandes",
+    titre: "Commandes",
+    badge: "Clients",
+    icon: ClipboardList,
     items: [
       {
-        view: "afnor",
-        label: "Diagramme de Gantt",
-        description: "Décomposition des temps et indicateurs de performance",
-        icon: CalendarRange,
+        view: "of",
+        label: "Ordres de fabrication",
+        description: "Avancement des ordres de fabrication",
+        icon: ClipboardList,
       },
       {
-        view: "arrets",
-        label: "Journal des arrêts",
-        description: "Micro-arrêts, causes de panne et Pareto",
-        icon: AlertTriangle,
-      },
-      {
-        view: "qualite",
-        label: "Contrôle Qualité",
-        description: "Rejets, conformité BPF et échantillons",
-        icon: ShieldCheck,
-      },
-      {
-        view: "maintenance",
-        label: "Maintenance & GMAO",
-        description: "Interventions curatives et préventives",
-        icon: Wrench,
+        view: "commandes",
+        label: "Commandes & livraisons",
+        description: "Commandes clients et dates de livraison",
+        icon: Truck,
       },
     ],
   },
   {
     id: "ressources",
-    titre: "Ressources & Logistique",
-    badge: "Atelier",
+    titre: "Ressources",
+    badge: "Documents",
     icon: Package,
     items: [
       {
-        view: "stock",
-        label: "Stocks Produits",
-        description: "Niveaux de stocks et seuils d'alerte",
-        icon: Package,
-      },
-      {
-        view: "articles",
-        label: "Articles & Recettes",
-        description: "Nomenclatures et spécifications articles",
-        icon: Package,
-      },
-      {
-        view: "matieres",
-        label: "Matières premières",
-        description: "Traçabilité des lots et consommations",
-        icon: FlaskConical,
-      },
-      {
-        view: "lignes",
-        label: "Lignes de production",
-        description: "Configuration technique des lignes",
-        icon: Factory,
-      },
-      {
-        view: "fournisseurs",
-        label: "Fournisseurs",
-        description: "Gestion des partenaires et réceptions",
-        icon: Truck,
+        view: "rapports",
+        label: "Rapports",
+        description: "Rapports de production à exporter",
+        icon: FileText,
       },
       {
         view: "documents",
-        label: "Documentation BPF",
-        description: "Procédures opératoires et fiches techniques",
+        label: "Documentation",
+        description: "Procédures et fiches techniques",
         icon: BookOpen,
+      },
+      {
+        view: "admin",
+        label: "Administration",
+        description: "Utilisateurs, droits et audit",
+        icon: UserCog,
       },
     ],
   },
@@ -162,19 +124,11 @@ interface SidebarProps {
   onChange: (v: NavView) => void
   open: boolean
   onToggle: () => void
-  ligneId: number | null
-  onChangeLigne: (id: number | null) => void
 }
 
-export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne }: SidebarProps) {
-  const [lignes, setLignes] = useState<LigneProduction[]>([])
+export function Sidebar({ view, onChange, open, onToggle }: SidebarProps) {
   const [activeDrawer, setActiveDrawer] = useState<DrawerCategory>(null)
-  const { connected } = useWebSocket()
   const { user, logout } = useAuth()
-
-  useEffect(() => {
-    lignesApi.list().then(setLignes).catch(() => {})
-  }, [])
 
   // Fermer le drawer avec la touche Echap
   useEffect(() => {
@@ -203,12 +157,6 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
   function handleSelectView(nextView: NavView) {
     onChange(nextView)
     setActiveDrawer(null)
-  }
-
-  function getActiveLineLabel() {
-    if (!ligneId) return "Toutes les lignes"
-    const l = lignes.find((item) => item.id === ligneId)
-    return l ? l.designation : "Ligne sélectionnée"
   }
 
   const activeCategoryData = categoriesVisibles.find((c) => c.id === activeDrawer)
@@ -242,8 +190,8 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
           {/* Logo Nova icon-only (sans boîte ni bordure, uniquement le glyphe violet) */}
           <button
             type="button"
-            onClick={() => handleSelectView("dashboard")}
-            title="Nova MES"
+            onClick={() => handleSelectView("atelier")}
+            title="Nova"
             className="group relative flex size-12 items-center justify-center rounded-xl transition-transform hover:bg-accent/60 active:scale-95"
           >
             <img
@@ -287,67 +235,8 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
           </nav>
         </div>
 
-        {/* Partie Basse : Ligne active, Admin, WebSocket & Logout */}
+        {/* Partie Basse : Logout */}
         <div className="flex w-full flex-col items-center gap-2">
-          {/* Bouton sélecteur de ligne */}
-          <div className="group relative">
-            <button
-              type="button"
-              onClick={() => toggleCategory("lignes")}
-              title={`Ligne : ${getActiveLineLabel()}`}
-              className={cn(
-                "flex size-11 items-center justify-center rounded-xl transition-all",
-                activeDrawer === "lignes"
-                  ? "bg-foreground text-background"
-                  : ligneId
-                    ? "bg-accent text-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
-              )}
-            >
-              <Factory className="size-5" />
-              {ligneId && (
-                <span className="absolute right-2 top-2 size-2 rounded-full bg-emerald-500" />
-              )}
-            </button>
-            <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background opacity-0 transition-opacity group-hover:opacity-100">
-              Lignes ({getActiveLineLabel()})
-            </span>
-          </div>
-
-          {/* Admin si autorisé */}
-          {user?.is_admin && (
-            <div className="group relative">
-              <button
-                type="button"
-                onClick={() => handleSelectView("admin")}
-                title="Administration"
-                className={cn(
-                  "flex size-11 items-center justify-center rounded-xl transition-all cursor-pointer",
-                  view === "admin"
-                    ? "bg-violet-600 text-white shadow-md shadow-violet-500/30 font-bold"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                )}
-              >
-                <UserCog className="size-5" />
-              </button>
-              <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background opacity-0 transition-opacity group-hover:opacity-100">
-                Administration
-              </span>
-            </div>
-          )}
-
-          {/* Témoin WebSocket */}
-          <div
-            className="flex size-7 items-center justify-center rounded-full"
-            title={connected ? "Flux temps réel actif" : "Flux temps réel interrompu"}
-          >
-            {connected ? (
-              <Wifi className="size-4 text-emerald-500" />
-            ) : (
-              <WifiOff className="size-4 text-destructive" />
-            )}
-          </div>
-
           <div className="h-px w-8 bg-border/80" />
 
           {/* Déconnexion */}
@@ -391,94 +280,7 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
               "animate-in fade-in slide-in-from-left-4 duration-200",
             )}
           >
-            {/* Cas 1 : Sélecteur de Ligne Active */}
-            {activeDrawer === "lignes" ? (
-              <>
-                <div className="flex items-center justify-between border-b border-border/80 p-4">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex size-9 items-center justify-center rounded-lg bg-muted text-foreground">
-                      <Factory className="size-5" />
-                    </div>
-                    <div>
-                      <h2 className="text-sm font-semibold tracking-tight text-foreground">
-                        Lignes de Production
-                      </h2>
-                      <p className="text-xs text-muted-foreground">
-                        Filtrer la supervision d'atelier
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setActiveDrawer(null)}
-                    className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                  >
-                    <X className="size-4" />
-                  </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onChangeLigne(null)
-                      setActiveDrawer(null)
-                    }}
-                    className={cn(
-                      "flex w-full items-center justify-between rounded-xl p-3 text-left transition-all",
-                      ligneId === null
-                        ? "bg-accent text-foreground font-medium"
-                        : "hover:bg-accent text-foreground",
-                    )}
-                  >
-                    <div>
-                      <p className="text-sm">Toutes les lignes</p>
-                      <p
-                        className={cn(
-                          "text-xs",
-                          ligneId === null ? "text-muted-foreground" : "text-muted-foreground",
-                        )}
-                      >
-                        Vue d'ensemble globale de l'usine
-                      </p>
-                    </div>
-                    {ligneId === null && <Check className="size-4" />}
-                  </button>
-
-                  {lignes.map((l) => (
-                    <button
-                      key={l.id}
-                      type="button"
-                      onClick={() => {
-                        onChangeLigne(l.id)
-                        setActiveDrawer(null)
-                      }}
-                      className={cn(
-                        "flex w-full items-center justify-between rounded-xl p-3 text-left transition-all",
-                        ligneId === l.id
-                          ? "bg-accent text-foreground font-medium"
-                          : "hover:bg-accent text-foreground",
-                      )}
-                    >
-                      <div>
-                        <p className="text-sm font-medium">{l.designation}</p>
-                        <p
-                          className={cn(
-                            "text-xs",
-                            ligneId === l.id ? "text-muted-foreground" : "text-muted-foreground",
-                          )}
-                        >
-                          Ligne #{l.id}
-                        </p>
-                      </div>
-                      {ligneId === l.id && <Check className="size-4" />}
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : (
-              /* Cas 2 : Catégorie de navigation (Pilotage, Analyse, Ressources) */
-              activeCategoryData && (
+            {activeCategoryData && (
                 <>
                   <div className="flex items-center justify-between border-b border-border/80 p-4">
                     <div className="flex items-center gap-2.5">
@@ -553,8 +355,7 @@ export function Sidebar({ view, onChange, open, onToggle, ligneId, onChangeLigne
                     })}
                   </div>
                 </>
-              )
-            )}
+              )}
           </div>
         </>
       )}

@@ -9,8 +9,6 @@ import type { DocumentPassage } from "@/lib/types"
 export function AppShell({
   view,
   onChangeView,
-  ligneId,
-  onChangeLigne,
   onDocumentsPassages,
   aiPanelOpen,
   onAiPanelOpenChange,
@@ -19,8 +17,6 @@ export function AppShell({
 }: {
   view: NavView
   onChangeView: (v: NavView) => void
-  ligneId: number | null
-  onChangeLigne: (id: number | null) => void
   onDocumentsPassages: (passages: DocumentPassage[]) => void
   aiPanelOpen: boolean
   onAiPanelOpenChange: (open: boolean) => void
@@ -69,8 +65,6 @@ export function AppShell({
         onChange={handleNavigate}
         open={sidebarOpen}
         onToggle={() => setSidebarOpen((v) => !v)}
-        ligneId={ligneId}
-        onChangeLigne={onChangeLigne}
       />
       <div
         className={cn(
@@ -89,10 +83,10 @@ export function AppShell({
               <Menu className="size-4" />
             </button>
             <img src="/nova-logo.png" alt="Nova" className="size-8 object-contain" />
-            <p className="truncate text-sm font-semibold">Nova MES</p>
+            <p className="truncate text-sm font-semibold">Nova</p>
           </header>
           <main
-            className={`flex min-h-0 min-w-0 flex-1 flex-col ${view === "dashboard" || view === "afnor" || view === "arrets" || view === "qualite" ? "overflow-hidden" : "overflow-y-auto"}`}
+            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto"
           >
             {children}
           </main>
