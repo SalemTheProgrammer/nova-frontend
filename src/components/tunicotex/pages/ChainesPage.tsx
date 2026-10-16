@@ -4,11 +4,10 @@ import { Page, Select, TextInput } from "@/components/shared/primitives"
 import { ChaineDetail } from "@/components/tunicotex/ChaineDetail"
 import { Chargement, ErreurDivatex, Vide } from "@/components/tunicotex/EtatsDonnees"
 import { useReference } from "@/components/tunicotex/useReference"
+import { messageErreur, pct } from "@/components/tunicotex/format"
 import { useResource } from "@/lib/useResource"
 import { tunicotexApi, type ProductionLigne } from "@/lib/tunicotex"
 import { cn } from "@/lib/utils"
-
-const pct = (f: number | null): string => (f == null ? "—" : `${Math.round(f * 100)} %`)
 
 type Cle =
   | "code"
@@ -71,11 +70,6 @@ function comparer(a: string | number | null, b: string | number | null): number 
   if (b == null) return -1
   if (typeof a === "number" && typeof b === "number") return a - b
   return String(a).localeCompare(String(b), "fr")
-}
-
-function messageErreur(erreur: string | null): string | undefined {
-  if (!erreur || /DIVA injoignable/i.test(erreur)) return undefined
-  return erreur
 }
 
 export function ChainesPage() {

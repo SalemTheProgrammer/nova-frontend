@@ -10,6 +10,7 @@ import { AdminUsersPage } from "@/components/admin/AdminUsersPage"
 import { AtelierPage } from "@/components/tunicotex/pages/AtelierPage"
 import { ChainesPage } from "@/components/tunicotex/pages/ChainesPage"
 import { OfPage } from "@/components/tunicotex/pages/OfPage"
+import { OperateursPage } from "@/components/tunicotex/pages/OperateursPage"
 import { aiChatBus } from "@/lib/aiChatBus"
 import { useAuth } from "@/lib/auth"
 import { canAccessView, firstAccessibleView } from "@/lib/permissions"
@@ -75,6 +76,7 @@ function AppContent({ view }: { view: NavView }) {
       case "of":
         return <OfPage />
       case "operateurs":
+        return <OperateursPage />
       case "commandes":
       case "rapports":
         return <EnConstruction />

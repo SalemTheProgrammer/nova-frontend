@@ -13,15 +13,9 @@ import { X } from "lucide-react"
 import { Card } from "@/components/shared/primitives"
 import { RapportActions } from "@/components/tunicotex/RapportActions"
 import { Chargement, ErreurDivatex } from "@/components/tunicotex/EtatsDonnees"
+import { messageErreur, pct } from "@/components/tunicotex/format"
 import { useResource } from "@/lib/useResource"
 import { formatDateFr, tunicotexApi } from "@/lib/tunicotex"
-
-const pct = (f: number | null): string => (f == null ? "—" : `${Math.round(f * 100)} %`)
-
-function messageErreur(erreur: string | null): string | undefined {
-  if (!erreur || /DIVA injoignable/i.test(erreur)) return undefined
-  return erreur
-}
 
 function Contenu({
   id,
