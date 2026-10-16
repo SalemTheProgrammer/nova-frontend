@@ -5,18 +5,18 @@ export function useResource<T>(fetcher: () => Promise<T>, deps: unknown[] = []) 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const derniere = useRef(0)
-  useEffect(
-    () => () => {
-      derniere.current = -1 // démonté : plus aucune réponse n'est prise en compte
-    },
-    [],
-  )
+  const derniere = useRef(0) // identifiant de la dernière requête (obsolescence uniquement)
+  const monte = useRef(false)
+  useEffect(() => {
+    monte.current = true
+    return () => {
+      monte.current = false
+    }
+  }, [])
 
   const reload = useCallback(async () => {
-    const id = derniere.current < 0 ? -1 : ++derniere.current
-    if (id < 0) return
-    const courante = () => derniere.current === id
+    const id = ++derniere.current
+    const courante = () => derniere.current === id && monte.current
     setLoading(true)
     setError(null)
     try {
