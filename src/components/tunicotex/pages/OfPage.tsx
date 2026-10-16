@@ -105,7 +105,7 @@ function DetailOf({ id, risque }: { id: number; risque: OFRisque | undefined }) 
           <div className="min-w-0">
             <h2 className="break-all text-base font-bold tracking-tight">{o.numero}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {o.client ?? "Client inconnu"} · {o.article ?? "Article inconnu"}
+              {[o.client, o.article].filter(Boolean).join(" · ") || "Client et article inconnus"}
             </p>
             <p className="mt-1 text-sm tabular-nums text-muted-foreground">
               {o.quantite} pièces · export prévu {formatDateFr(o.date_export_prevue)} ·{" "}
@@ -184,14 +184,20 @@ export function OfPage() {
     return [...noms].sort((a, b) => a.localeCompare(b, "fr"))
   }, [resultats.data])
 
+  const risquesIndispo = !!risques.error
+  const clientEffectif = clients.includes(client) ? client : ""
+  useEffect(() => {
+    if (client && !resultats.loading && !clients.includes(client)) setClient("")
+  }, [client, clients, resultats.loading])
+
   const liste = useMemo<OFResume[]>(
     () =>
       (resultats.data ?? []).filter(
         (o) =>
-          (!client || o.client === client) &&
-          (!retardSeul || parId.get(o.id)?.statut === "en_retard"),
+          (!clientEffectif || o.client === clientEffectif) &&
+          (!retardSeul || risquesIndispo || parId.get(o.id)?.statut === "en_retard"),
       ),
-    [resultats.data, client, retardSeul, parId],
+    [resultats.data, clientEffectif, retardSeul, parId],
   )
 
   function choisir(id: number) {
@@ -215,7 +221,7 @@ export function OfPage() {
         <Select
           aria-label="Client"
           className="w-auto max-w-56"
-          value={client}
+          value={clientEffectif}
           onChange={(e) => setClient(e.target.value)}
         >
           <option value="">Tous les clients</option>
@@ -233,10 +239,14 @@ export function OfPage() {
           <input
             type="checkbox"
             checked={retardSeul}
+            disabled={risques.loading || risquesIndispo}
             onChange={(e) => setRetardSeul(e.target.checked)}
           />
           En retard seulement
         </label>
+        {risquesIndispo && (
+          <span className="text-xs text-muted-foreground">Statuts de retard indisponibles</span>
+        )}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
@@ -271,10 +281,10 @@ export function OfPage() {
                     </div>
                     <div className="mt-0.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
                       <span
-                        title={`${o.client ?? ""} · ${o.article ?? ""}`}
+                        title={[o.client, o.article].filter(Boolean).join(" · ")}
                         className="min-w-0 truncate"
                       >
-                        {o.client ?? "—"} · {o.article ?? "—"}
+                        {[o.client, o.article].filter(Boolean).join(" · ") || "—"}
                       </span>
                       <span className="shrink-0 tabular-nums">
                         {o.quantite} p. · {formatDateFr(o.date_export_prevue)} ·{" "}
