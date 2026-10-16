@@ -4,7 +4,7 @@ import { Page, Select, TextInput } from "@/components/shared/primitives"
 import { ChaineDetail } from "@/components/tunicotex/ChaineDetail"
 import { Chargement, ErreurDivatex, Vide } from "@/components/tunicotex/EtatsDonnees"
 import { useReference } from "@/components/tunicotex/useReference"
-import { messageErreur, pct } from "@/components/tunicotex/format"
+import { comparerValeurs, messageErreur, pct } from "@/components/tunicotex/format"
 import { useResource } from "@/lib/useResource"
 import { tunicotexApi, type ProductionLigne } from "@/lib/tunicotex"
 import { cn } from "@/lib/utils"
@@ -64,14 +64,6 @@ function valeur(l: ProductionLigne, cle: Cle): string | number | null {
   }
 }
 
-function comparer(a: string | number | null, b: string | number | null): number {
-  if (a == null && b == null) return 0
-  if (a == null) return 1
-  if (b == null) return -1
-  if (typeof a === "number" && typeof b === "number") return a - b
-  return String(a).localeCompare(String(b), "fr")
-}
-
 export function ChainesPage() {
   const ref = useReference()
   const [dateChoisie, setDateChoisie] = useState("")
@@ -91,8 +83,7 @@ export function ChainesPage() {
   const lignes = useMemo(() => {
     const copie = [...(chaines.data ?? [])]
     copie.sort((a, b) => {
-      const c = comparer(valeur(a, tri.cle), valeur(b, tri.cle))
-      return tri.asc ? c : -c
+      return comparerValeurs(valeur(a, tri.cle), valeur(b, tri.cle), tri.asc)
     })
     return copie
   }, [chaines.data, tri])
@@ -183,6 +174,7 @@ export function ChainesPage() {
                   <tr
                     key={l.ligne.id}
                     tabIndex={0}
+                    role="button"
                     onClick={() => setOuverte(l.ligne.id)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {

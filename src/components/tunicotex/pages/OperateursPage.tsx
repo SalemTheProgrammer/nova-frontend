@@ -16,7 +16,7 @@ import { ArrowDown, ArrowUp, X } from "lucide-react"
 import { Card, Page, Select, TextInput } from "@/components/shared/primitives"
 import { Chargement, ErreurDivatex, Vide } from "@/components/tunicotex/EtatsDonnees"
 import { RapportActions } from "@/components/tunicotex/RapportActions"
-import { messageErreur, pct } from "@/components/tunicotex/format"
+import { comparerValeurs, messageErreur, pct } from "@/components/tunicotex/format"
 import { useReference } from "@/components/tunicotex/useReference"
 import { useResource } from "@/lib/useResource"
 import { formatDateFr, tunicotexApi, type RendementOperateur } from "@/lib/tunicotex"
@@ -63,14 +63,6 @@ function valeur(o: RendementOperateur, rang: number, cle: Cle): string | number 
     case "rendement":
       return o.rendement
   }
-}
-
-function comparer(a: string | number | null, b: string | number | null): number {
-  if (a == null && b == null) return 0
-  if (a == null) return 1
-  if (b == null) return -1
-  if (typeof a === "number" && typeof b === "number") return a - b
-  return String(a).localeCompare(String(b), "fr")
 }
 
 const minutes = (m: number): string => `${Math.round(m)} min`
@@ -257,8 +249,7 @@ export function OperateursPage() {
   const lignes = useMemo(() => {
     const copie = [...classes]
     copie.sort((a, b) => {
-      const c = comparer(valeur(a.o, a.rang, tri.cle), valeur(b.o, b.rang, tri.cle))
-      return tri.asc ? c : -c
+      return comparerValeurs(valeur(a.o, a.rang, tri.cle), valeur(b.o, b.rang, tri.cle), tri.asc)
     })
     return copie
   }, [classes, tri])
@@ -427,6 +418,7 @@ export function OperateursPage() {
                   <tr
                     key={o.operateur.id}
                     tabIndex={0}
+                    role="button"
                     onClick={() => ouvrir(o.operateur.id)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
