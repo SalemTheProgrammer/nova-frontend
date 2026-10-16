@@ -1,8 +1,8 @@
 import type { PhasePipelineItem, TaillesPipeline } from "@/lib/tunicotex"
 
-function pct(valeur: number): number {
-  return Math.max(0, Math.min(100, valeur <= 1 ? valeur * 100 : valeur))
-}
+/** `pct` du backend est toujours une fraction 0-1 (1.2 = 120 %). */
+const enPourcent = (fraction: number): number => fraction * 100
+const largeurBarre = (fraction: number): number => Math.max(0, Math.min(100, enPourcent(fraction)))
 
 /** Avancement par phase d'un OF, avec le détail par taille en option. */
 export function PhasePipeline({
@@ -19,11 +19,11 @@ export function PhasePipeline({
           <li key={p.nom} className="flex items-center gap-3 text-sm">
             <span className="w-32 shrink-0 truncate text-muted-foreground sm:w-44">{p.nom}</span>
             <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-primary" style={{ width: `${pct(p.pct)}%` }} />
+              <div className="h-full rounded-full bg-primary" style={{ width: `${largeurBarre(p.pct)}%` }} />
             </div>
             <span className="w-24 shrink-0 text-right tabular-nums">
               {p.quantite}{" "}
-              <span className="text-xs text-muted-foreground">({Math.round(pct(p.pct))} %)</span>
+              <span className="text-xs text-muted-foreground">({Math.round(enPourcent(p.pct))} %)</span>
             </span>
           </li>
         ))}

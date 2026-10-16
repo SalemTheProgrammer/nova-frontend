@@ -94,9 +94,17 @@ function AppContent({ view }: { view: NavView }) {
 
 /** Utilisateur sans aucun outil activé : pas de redirection possible. */
 function AucunAcces() {
+  const { logout } = useAuth()
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-background p-6 text-center text-sm text-muted-foreground">
-      Aucun accès — demandez à l'administrateur d'activer vos outils.
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background p-6 text-center text-sm text-muted-foreground">
+      <p>Aucun accès — demandez à l'administrateur d'activer vos outils.</p>
+      <button
+        type="button"
+        onClick={logout}
+        className="rounded-lg border border-border px-3 py-1.5 font-medium text-foreground hover:bg-accent"
+      >
+        Se déconnecter
+      </button>
     </div>
   )
 }
