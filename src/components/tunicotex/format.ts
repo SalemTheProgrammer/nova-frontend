@@ -31,8 +31,9 @@ const TAUX_ABERRANT = 2
 /** Pourquoi une chaîne est exclue des comparaisons sortie / objectif, ou `null`. */
 export function aVerifier(l: ProductionLigne): RaisonVerification | null {
   if (!l.a_des_lectures) return "sans_lecture"
-  if (l.objectif_perime) return "objectif_ancien"
+  // Un taux non crédible prime : la chaîne sort du graphique même si son objectif est ancien.
   if (l.taux != null && l.taux > TAUX_ABERRANT) return "taux_aberrant"
+  if (l.objectif_perime) return "objectif_ancien"
   return null
 }
 
@@ -41,4 +42,12 @@ export function aVerifier(l: ProductionLigne): RaisonVerification | null {
 export function exclueDuGraphique(l: ProductionLigne): boolean {
   const r = aVerifier(l)
   return r === "sans_lecture" || r === "taux_aberrant"
+}
+
+/** Texte d'info-bulle pour un objectif ancien (« objectif du 01/04 »), ou `null`. */
+export function infoObjectif(l: ProductionLigne): string | null {
+  if (!l.objectif_perime) return null
+  if (!l.objectif_date) return "objectif ancien"
+  const [a, m, j] = l.objectif_date.slice(0, 10).split("-")
+  return `objectif du ${j}/${m}/${a}`
 }

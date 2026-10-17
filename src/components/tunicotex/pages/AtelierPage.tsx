@@ -15,6 +15,7 @@ import { ArrowRight, Sparkles } from "lucide-react"
 import { Button, Page, Select, TextInput } from "@/components/shared/primitives"
 import { DateDonnees } from "@/components/tunicotex/DateDonnees"
 import { DonneesAVerifier } from "@/components/tunicotex/DonneesAVerifier"
+import { BadgeObjectif } from "@/components/tunicotex/BadgeObjectif"
 import { exclueDuGraphique } from "@/components/tunicotex/format"
 import { KpiTiles } from "@/components/tunicotex/KpiTiles"
 import { Panneau } from "@/components/tunicotex/Panneau"
@@ -279,9 +280,10 @@ export function AtelierPage() {
         )}
       </div>
 
-      {ref.loading || (atelier.loading && !donnees) ? (
+      {/* Premier chargement seulement : un rafraîchissement garde les données affichées. */}
+      {(ref.loading && !ref.dateReference) || (atelier.loading && !donnees) ? (
         <Chargement />
-      ) : atelier.error || ref.error ? (
+      ) : (atelier.error || ref.error) && !donnees ? (
         <ErreurDivatex
           onRetry={() => {
             ref.reload()
@@ -391,7 +393,13 @@ export function AtelierPage() {
               <SousListe
                 titre={`Chaînes sous l'objectif (${sousObjectif.length})`}
                 lien="/app/chaines"
-                vide={sousObjectif.length === 0 ? "Toutes les chaînes sont dans l'objectif." : null}
+                vide={
+                  comparables.length === 0
+                    ? `Aucune chaîne avec un objectif${groupe ? " dans ce groupe" : ""}.`
+                    : sousObjectif.length === 0
+                      ? "Toutes les chaînes sont dans l'objectif."
+                      : null
+                }
               >
                 {sousObjectif.slice(0, taille).map((l) => (
                   <li key={l.ligne.id}>
@@ -405,6 +413,7 @@ export function AtelierPage() {
                       <span className="shrink-0 tabular-nums text-muted-foreground">
                         {l.sortie} / {l.objectif} ·{" "}
                         <span className="text-destructive">{pct(l.taux)}</span>
+                        <BadgeObjectif l={l} />
                       </span>
                     </Link>
                   </li>

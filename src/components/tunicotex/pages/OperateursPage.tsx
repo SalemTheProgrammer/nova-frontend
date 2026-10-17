@@ -433,6 +433,7 @@ export function OperateursPage() {
           </section>
 
           <MaitreDetail
+            selection={ouvert}
             detail={
               ouvert != null && du && au ? (
                 <Fiche

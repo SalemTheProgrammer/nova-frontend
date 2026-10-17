@@ -8,7 +8,8 @@ import { MaitreDetail } from "@/components/tunicotex/MaitreDetail"
 import { Panneau } from "@/components/tunicotex/Panneau"
 import { Chargement, ErreurDivatex, Vide } from "@/components/tunicotex/EtatsDonnees"
 import { useReference } from "@/components/tunicotex/useReference"
-import { comparerValeurs, messageErreur, pct } from "@/components/tunicotex/format"
+import { BadgeObjectif } from "@/components/tunicotex/BadgeObjectif"
+import { aVerifier, comparerValeurs, messageErreur, pct } from "@/components/tunicotex/format"
 import { useResource } from "@/lib/useResource"
 import { tunicotexApi, type ProductionLigne } from "@/lib/tunicotex"
 import { cn } from "@/lib/utils"
@@ -30,6 +31,9 @@ function statutDe(l: ProductionLigne): Statut {
   if (!l.a_des_lectures) return { libelle: "aucune lecture", classe: "bg-muted text-muted-foreground", rang: 0 }
   if (l.objectif == null || l.objectif <= 0 || l.taux == null)
     return { libelle: "sans objectif", classe: "bg-muted text-muted-foreground", rang: 0 }
+  // 1003 % n'est pas un « objectif atteint » : l'objectif est à corriger dans DIVA.
+  if (aVerifier(l) === "taux_aberrant")
+    return { libelle: "à vérifier", classe: "bg-amber-500/15 text-amber-700 dark:text-amber-400", rang: 0 }
   if (l.taux >= 1)
     return {
       libelle: "objectif atteint",
@@ -101,7 +105,10 @@ function LigneChaine({
       <td className="hidden px-3 py-1.5 2xl:table-cell">{l.ligne.nature}</td>
       <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">{l.objectif ?? "—"}</td>
       <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">{l.sortie}</td>
-      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">{pct(l.taux)}</td>
+      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
+        {pct(l.taux)}
+        <BadgeObjectif l={l} />
+      </td>
       <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">{l.effectif}</td>
       <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">{pct(rendementDe(l))}</td>
       <td className="px-3 py-1.5">
@@ -213,6 +220,7 @@ export function ChainesPage() {
         <Vide raison="Aucune chaîne pour ce jour." />
       ) : (
         <MaitreDetail
+          selection={choisie}
           maitre={
             <Panneau titre="Chaînes" compteur={lignes.length} corpsClassName="overflow-x-auto">
               <table className="w-full text-sm">

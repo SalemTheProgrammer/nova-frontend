@@ -259,6 +259,7 @@ export function CommandesPage() {
         <Vide raison="Aucun OF en retard ni à risque sur cet horizon." />
       ) : (
         <MaitreDetail
+          selection={q || groupe?.nom}
           colonnes="@min-[900px]:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
           maitre={
             <Panneau titre="Clients" compteur={groupes.length}>

@@ -274,6 +274,7 @@ export function OfPage() {
       </div>
 
       <MaitreDetail
+        selection={selection}
         colonnes="@min-[900px]:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
         maitre={
           <Panneau
