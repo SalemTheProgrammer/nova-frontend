@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 export function Page({
   title,
   description,
+  meta,
   actions,
   children,
   fullHeight = false,
@@ -12,8 +13,11 @@ export function Page({
 }: {
   title?: string
   description?: string
+  /** Information courte affichée à côté du titre (ex. date des données). */
+  meta?: ReactNode
   actions?: ReactNode
   children: ReactNode
+  /** Page en une seule vue : à partir de `lg`, la page occupe la hauteur et ne défile pas. */
   fullHeight?: boolean
   className?: string
 }) {
@@ -26,19 +30,25 @@ export function Page({
   const hasHeader = Boolean(title) || Boolean(actions)
   if (fullHeight) {
     return (
-      <div className={cn("flex h-full min-w-0 flex-col overflow-hidden p-3 sm:p-4 xl:p-6", className)}>
+      <div
+        className={cn(
+          "flex min-w-0 flex-col p-3 sm:p-4 lg:h-full lg:overflow-hidden xl:px-6 xl:py-5",
+          className,
+        )}
+      >
         {hasHeader && (
-          <div className="page-header mb-3 flex shrink-0 items-center justify-between gap-3">
-            <div className="min-w-0 sm:flex sm:items-baseline sm:gap-3">
+          <div className="page-header mb-3 flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
+            <div className="flex min-w-0 items-baseline gap-3">
               {title && <h1 className="truncate text-lg font-semibold tracking-tight">{title}</h1>}
+              {meta}
               {description && (
-                <p className="hidden text-sm text-muted-foreground md:block">{description}</p>
+                <p className="hidden truncate text-sm text-muted-foreground xl:block">{description}</p>
               )}
             </div>
-            {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+            {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
           </div>
         )}
-        <div className="min-h-0 flex-1">{children}</div>
+        <div className="flex min-w-0 flex-col lg:min-h-0 lg:flex-1">{children}</div>
       </div>
     )
   }

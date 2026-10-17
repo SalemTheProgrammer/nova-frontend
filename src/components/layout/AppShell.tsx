@@ -4,10 +4,7 @@ import { cn } from "@/lib/utils"
 import { Sidebar, type NavView } from "@/components/Sidebar"
 import { RightAIAgent } from "@/components/layout/RightAIAgent"
 import { NovaLogo } from "@/components/NovaLogo"
-import { ReferenceBanner } from "@/components/tunicotex/ReferenceBanner"
 import type { DocumentPassage } from "@/lib/types"
-
-const VUES_TUNICOTEX: NavView[] = ["atelier", "chaines", "of", "operateurs", "commandes", "rapports"]
 
 export function AppShell({
   view,
@@ -88,7 +85,6 @@ export function AppShell({
             <img src="/nova-logo.png" alt="Nova" className="size-8 object-contain" />
             <p className="truncate text-sm font-semibold">Nova</p>
           </header>
-          {VUES_TUNICOTEX.includes(view) && <ReferenceBanner />}
           <main
             className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto"
           >
