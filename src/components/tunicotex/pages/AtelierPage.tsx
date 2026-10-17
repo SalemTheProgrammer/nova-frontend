@@ -77,9 +77,15 @@ export function AtelierPage() {
     () => (jour ? tunicotexApi.atelier(jour) : Promise.resolve(null)),
     [jour],
   )
+  // Même jour que la tuile « OF en retard » : la date choisie, pas la référence.
   const retards = useResource(
-    () => tunicotexApi.commandesARisque().then((r) => r.filter((o) => o.statut === "en_retard")),
-    [],
+    () =>
+      jour
+        ? tunicotexApi
+            .commandesARisque(undefined, undefined, jour)
+            .then((r) => r.filter((o) => o.statut === "en_retard"))
+        : Promise.resolve([]),
+    [jour],
   )
 
   const donnees = atelier.data
@@ -136,7 +142,7 @@ export function AtelierPage() {
         libelle: "OF en retard",
         valeur: s.nb_of_en_retard,
         etat: s.nb_of_en_retard > 0 ? "alerte" : "ok",
-        note: groupe ? "tout l'atelier" : undefined,
+        note: groupe ? "7 derniers jours, tout l'atelier" : "7 derniers jours",
       },
     ]
   }, [donnees, groupe, lignes, ref.calibre])
@@ -292,7 +298,7 @@ export function AtelierPage() {
             </Card>
 
             <Card className="min-w-0 p-4">
-              <h3 className="mb-3 text-sm font-medium">OF en retard</h3>
+              <h3 className="mb-3 text-sm font-medium">OF en retard (7 derniers jours)</h3>
               {retards.loading ? (
                 <Chargement />
               ) : retards.error ? (
@@ -301,7 +307,9 @@ export function AtelierPage() {
                   message={messageErreur(retards.error)}
                 />
               ) : (retards.data ?? []).length === 0 ? (
-                <p className="text-sm text-muted-foreground">Aucun OF en retard.</p>
+                <p className="text-sm text-muted-foreground">
+                  Aucun OF en retard sur les 7 derniers jours.
+                </p>
               ) : (
                 <ul className="space-y-1.5 text-sm">
                   {(retards.data ?? []).map((r) => (

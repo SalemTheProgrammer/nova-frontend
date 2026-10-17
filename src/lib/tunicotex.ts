@@ -250,8 +250,8 @@ export const tunicotexApi = {
     request<RendementOperateur[]>("GET", `/tunicotex/operateurs${qs(p)}`),
   operateur: (id: number, du?: string, au?: string) =>
     request<FicheOperateur>("GET", `/tunicotex/operateurs/${id}${qs({ du, au })}`),
-  commandesARisque: (horizon?: number, client?: number) =>
-    request<OFRisque[]>("GET", `/tunicotex/commandes${qs({ horizon, client })}`),
+  commandesARisque: (horizon?: number, client?: number, date?: string) =>
+    request<OFRisque[]>("GET", `/tunicotex/commandes${qs({ horizon, client, date })}`),
   rechercherCommandes: (q: string) =>
     request<CommandeDetail[]>("GET", `/tunicotex/commandes/recherche${qs({ q })}`),
 

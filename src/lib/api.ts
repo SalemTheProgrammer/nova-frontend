@@ -79,8 +79,8 @@ async function fetchOk(method: string, path: string, body?: unknown): Promise<Re
     let message = `Requête échouée (${res.status})`
     let code: string | null = null
     try {
-      const data = (await res.json()) as Partial<ApiError> & { detail?: string }
-      message = data.error?.message ?? data.detail ?? message
+      const data = (await res.json()) as Partial<ApiError> & { detail?: unknown }
+      message = data.error?.message ?? texteDetail(data.detail) ?? message
       code = data.error?.code ?? null
     } catch {
       // no JSON body
@@ -88,6 +88,13 @@ async function fetchOk(method: string, path: string, body?: unknown): Promise<Re
     throw new ApiRequestError(message, res.status, code)
   }
   return res
+}
+
+/** `detail` FastAPI : un texte, ou un tableau d'erreurs de validation (422)
+ * qu'on n'affiche jamais brut (« [object Object] »). */
+function texteDetail(detail: unknown): string | undefined {
+  if (typeof detail === "string") return detail
+  return detail !== undefined && detail !== null ? "Paramètres invalides." : undefined
 }
 
 export async function request<T>(
@@ -137,8 +144,8 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
     handleUnauthorized(res.status)
     let message = `Requête échouée (${res.status})`
     try {
-      const data = (await res.json()) as ApiError & { detail?: string }
-      message = data.error?.message ?? data.detail ?? message
+      const data = (await res.json()) as Partial<ApiError> & { detail?: unknown }
+      message = data.error?.message ?? texteDetail(data.detail) ?? message
     } catch {
       // no JSON body
     }
@@ -252,8 +259,8 @@ export const documentsApi = {
     if (!res.ok) {
       let message = `PDF indisponible (${res.status})`
       try {
-        const data = (await res.json()) as ApiError & { detail?: string }
-        message = data.error?.message ?? data.detail ?? message
+        const data = (await res.json()) as Partial<ApiError> & { detail?: unknown }
+        message = data.error?.message ?? texteDetail(data.detail) ?? message
       } catch {
         // no JSON body
       }

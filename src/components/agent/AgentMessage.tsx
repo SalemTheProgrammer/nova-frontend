@@ -32,7 +32,7 @@ const TOOL_LABEL: Record<string, string> = {
   rechercher_documents: "Recherche dans la base documentaire",
   lister_documents_disponibles: "Lecture des documents disponibles",
   aller_a_la_page: "Redirection",
-  envoyer_rapport: "Envoi du bilan",
+  envoyer_rapport: "Envoi du rapport",
   envoyer_message: "Envoi du message",
   situation_atelier: "Situation de l'atelier",
   production_chaines: "Production des chaînes",

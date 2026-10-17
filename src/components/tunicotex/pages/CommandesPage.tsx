@@ -299,7 +299,11 @@ export function CommandesPage() {
       ) : (
         <>
           <div className="mb-4 grid grid-cols-2 gap-3 sm:max-w-md">
-            <Compteur libelle="En retard" valeur={retards} ton="text-destructive" />
+            <Compteur
+              libelle="En retard (7 derniers jours)"
+              valeur={retards}
+              ton="text-destructive"
+            />
             <Compteur
               libelle="À risque"
               valeur={donnees.length - retards}
