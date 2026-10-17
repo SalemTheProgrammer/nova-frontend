@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { useSearchParams } from "react-router-dom"
 import { Search } from "lucide-react"
-import { Card, Page, Select, TextInput } from "@/components/shared/primitives"
+import { Button, Page, Select, TextInput } from "@/components/shared/primitives"
+import { DateDonnees } from "@/components/tunicotex/DateDonnees"
+import { MaitreDetail } from "@/components/tunicotex/MaitreDetail"
+import { Panneau } from "@/components/tunicotex/Panneau"
 import { PhasePipeline } from "@/components/tunicotex/PhasePipeline"
 import { RapportActions } from "@/components/tunicotex/RapportActions"
-import { Chargement, ErreurDivatex, Vide } from "@/components/tunicotex/EtatsDonnees"
+import { Chargement, ErreurDivatex } from "@/components/tunicotex/EtatsDonnees"
 import { useDebounce } from "@/lib/useDebounce"
 import { useResource } from "@/lib/useResource"
 import {
@@ -17,6 +20,8 @@ import {
 import { cn } from "@/lib/utils"
 
 const pct = (f: number): string => `${Math.round(f * 100)} %`
+/** OF affichés d'un coup dans la liste ; « Afficher plus » ajoute la page suivante. */
+const PAGE = 50
 
 function messageErreur(erreur: string | null): string | undefined {
   if (!erreur || /DIVA injoignable/i.test(erreur)) return undefined
@@ -78,37 +83,26 @@ function MatriceTailles({ d }: { d: AvancementOF }) {
   )
 }
 
+function Section({ titre, children }: { titre: string; children: ReactNode }) {
+  return (
+    <div>
+      <h3 className="mb-2 text-xs font-medium text-muted-foreground">{titre}</h3>
+      {children}
+    </div>
+  )
+}
+
 function DetailOf({ id, risque }: { id: number; risque: OFRisque | undefined }) {
   const detail = useResource(() => tunicotexApi.of(id), [id])
   const d = detail.data
-
-  if (detail.loading) return <Chargement />
-  if (detail.error)
-    return (
-      <ErreurDivatex onRetry={() => void detail.reload()} message={messageErreur(detail.error)} />
-    )
-  if (!d) return null
-  const o = d.of
+  const o = d?.of
 
   return (
-    <div className="space-y-4">
-      <Card className="min-w-0 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="break-all text-base font-bold tracking-tight">{o.numero}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {[o.client, o.article].filter(Boolean).join(" · ") || "Client et article inconnus"}
-            </p>
-            <p className="mt-1 text-sm tabular-nums text-muted-foreground">
-              {o.quantite} pièces · export prévu {formatDateFr(o.date_export_prevue)} ·{" "}
-              {o.ouvert ? "ouvert" : "clos"} · finale {pct(o.avancement_final)}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Dernière lecture :{" "}
-              {d.derniere_lecture ? formatDateFr(d.derniere_lecture) : "aucune lecture"}
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-2">
+    <Panneau
+      titre={<span title={o?.numero}>{o?.numero ?? "Ordre de fabrication"}</span>}
+      extra={
+        o ? (
+          <>
             <BadgeRisque risque={risque} />
             <RapportActions
               type="R5"
@@ -116,41 +110,56 @@ function DetailOf({ id, risque }: { id: number; risque: OFRisque | undefined }) 
               parametres={{ of_id: o.id }}
               libelles={{ of_id: o.numero }}
             />
+          </>
+        ) : undefined
+      }
+      corpsClassName="space-y-5 px-4 py-3"
+    >
+      {detail.loading ? (
+        <Chargement />
+      ) : detail.error ? (
+        <ErreurDivatex onRetry={() => void detail.reload()} message={messageErreur(detail.error)} />
+      ) : d && o ? (
+        <>
+          <div className="space-y-0.5 text-sm text-muted-foreground">
+            <p>{[o.client, o.article].filter(Boolean).join(" · ") || "Client et article inconnus"}</p>
+            <p className="tabular-nums">
+              {o.quantite} pièces · export prévu {formatDateFr(o.date_export_prevue)} ·{" "}
+              {o.ouvert ? "ouvert" : "clos"} · finale {pct(o.avancement_final)} · dernière
+              lecture {d.derniere_lecture ? formatDateFr(d.derniere_lecture) : "aucune"}
+            </p>
           </div>
-        </div>
-      </Card>
 
-      <Card className="min-w-0 p-4">
-        <h3 className="mb-3 text-sm font-medium">Avancement par phase</h3>
-        {d.phases.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Aucune phase.</p>
-        ) : (
-          <PhasePipeline
-            phases={d.phases.map((p) => ({ nom: p.nom, quantite: p.quantite, pct: p.pct }))}
-          />
-        )}
-      </Card>
+          <Section titre="Avancement par phase">
+            {d.phases.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Aucune phase.</p>
+            ) : (
+              <PhasePipeline
+                phases={d.phases.map((p) => ({ nom: p.nom, quantite: p.quantite, pct: p.pct }))}
+              />
+            )}
+          </Section>
 
-      <Card className="min-w-0 p-4">
-        <h3 className="mb-3 text-sm font-medium">Taille × phase</h3>
-        <MatriceTailles d={d} />
-      </Card>
+          <Section titre="Taille × phase">
+            <MatriceTailles d={d} />
+          </Section>
 
-      <Card className="min-w-0 p-4">
-        <h3 className="mb-2 text-sm font-medium">Chaînes ayant travaillé dessus</h3>
-        {d.lignes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Aucune chaîne.</p>
-        ) : (
-          <ul className="flex flex-wrap gap-2">
-            {d.lignes.map((l) => (
-              <li key={l} className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium">
-                {l}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-    </div>
+          <Section titre="Chaînes ayant travaillé dessus">
+            {d.lignes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Aucune chaîne.</p>
+            ) : (
+              <ul className="flex flex-wrap gap-2">
+                {d.lignes.map((l) => (
+                  <li key={l} className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium">
+                    {l}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+        </>
+      ) : null}
+    </Panneau>
   )
 }
 
@@ -164,6 +173,7 @@ export function OfPage() {
   const [ouverts, setOuverts] = useState(true)
   const [client, setClient] = useState("")
   const [retardSeul, setRetardSeul] = useState(false)
+  const [visibles, setVisibles] = useState(PAGE)
 
   // Une seule fois par chargement de page : pas d'appel par ligne.
   const risques = useResource(() => tunicotexApi.commandesARisque(), [])
@@ -194,16 +204,33 @@ export function OfPage() {
           (!clientEffectif || o.client === clientEffectif) &&
           (!retardSeul || risquesIndispo || parId.get(o.id)?.statut === "en_retard"),
       ),
-    [resultats.data, clientEffectif, retardSeul, parId],
+    [resultats.data, clientEffectif, retardSeul, parId, risquesIndispo],
   )
+
+  // Nouvelle recherche ou nouveaux filtres : on repart des premiers OF.
+  useEffect(() => setVisibles(PAGE), [q, ouverts, clientEffectif, retardSeul])
+  const affiches = useMemo(() => {
+    const tete = liste.slice(0, visibles)
+    // Lien profond vers un OF plus bas dans la liste : il reste visible, en tête.
+    if (selection != null && !tete.some((o) => o.id === selection)) {
+      const choisi = liste.find((o) => o.id === selection)
+      if (choisi) return [choisi, ...tete]
+    }
+    return tete
+  }, [liste, visibles, selection])
 
   function choisir(id: number) {
     setParams({ id: String(id) })
   }
 
   return (
-    <Page title="Ordres de fabrication" description="Recherche et avancement par phase">
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+    <Page
+      fullHeight
+      title="Ordres de fabrication"
+      description="Recherche et avancement par phase"
+      meta={<DateDonnees />}
+    >
+      <div className="mb-3 flex shrink-0 flex-wrap items-center gap-3">
         <div className="relative min-w-56 flex-1 sm:max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <TextInput
@@ -246,63 +273,83 @@ export function OfPage() {
         )}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <div className="min-w-0">
-          {resultats.loading ? (
-            <Chargement />
-          ) : resultats.error ? (
-            <ErreurDivatex
-              onRetry={() => void resultats.reload()}
-              message={messageErreur(resultats.error)}
-            />
-          ) : liste.length === 0 ? (
-            <Vide raison="Aucun OF ne correspond à la recherche." />
-          ) : (
-            <ul className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border">
-              {liste.map((o) => (
-                <li key={o.id}>
-                  <button
-                    type="button"
-                    onClick={() => choisir(o.id)}
-                    aria-current={o.id === selection ? "true" : undefined}
-                    className={cn(
-                      "block w-full px-3 py-2.5 text-left hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none",
-                      o.id === selection && "bg-accent/60",
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span title={o.numero} className="min-w-0 truncate text-sm font-medium">
-                        {o.numero}
-                      </span>
-                      <BadgeRisque risque={parId.get(o.id)} />
-                    </div>
-                    <div className="mt-0.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                      <span
-                        title={[o.client, o.article].filter(Boolean).join(" · ")}
-                        className="min-w-0 truncate"
+      <MaitreDetail
+        colonnes="@min-[900px]:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
+        maitre={
+          <Panneau
+            titre="Ordres de fabrication"
+            compteur={resultats.loading || resultats.error ? undefined : liste.length}
+          >
+            {resultats.loading ? (
+              <Chargement />
+            ) : resultats.error ? (
+              <ErreurDivatex
+                onRetry={() => void resultats.reload()}
+                message={messageErreur(resultats.error)}
+              />
+            ) : liste.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                Aucun OF ne correspond à la recherche.
+              </p>
+            ) : (
+              <>
+                <ul className="divide-y divide-border/60">
+                  {affiches.map((o) => (
+                    <li key={o.id}>
+                      <button
+                        type="button"
+                        onClick={() => choisir(o.id)}
+                        aria-current={o.id === selection ? "true" : undefined}
+                        className={cn(
+                          "block w-full px-4 py-2 text-left hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none",
+                          o.id === selection && "bg-accent/70",
+                        )}
                       >
-                        {[o.client, o.article].filter(Boolean).join(" · ") || "—"}
-                      </span>
-                      <span className="shrink-0 tabular-nums">
-                        {o.quantite} p. · {formatDateFr(o.date_export_prevue)} ·{" "}
-                        {pct(o.avancement_final)}
-                      </span>
-                    </div>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="min-w-0">
-          {selection != null ? (
-            <DetailOf id={selection} risque={parId.get(selection)} />
+                        <div className="flex items-center justify-between gap-2">
+                          <span title={o.numero} className="min-w-0 truncate text-sm font-medium">
+                            {o.numero}
+                          </span>
+                          <BadgeRisque risque={parId.get(o.id)} />
+                        </div>
+                        <div className="mt-0.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                          <span
+                            title={[o.client, o.article].filter(Boolean).join(" · ")}
+                            className="min-w-0 truncate"
+                          >
+                            {[o.client, o.article].filter(Boolean).join(" · ") || "—"}
+                          </span>
+                          <span className="shrink-0 tabular-nums">
+                            {o.quantite} p. · {formatDateFr(o.date_export_prevue)} ·{" "}
+                            {pct(o.avancement_final)}
+                          </span>
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {visibles < liste.length && (
+                  <div className="border-t border-border/60 p-2 text-center">
+                    <Button variant="ghost" onClick={() => setVisibles((v) => v + PAGE)}>
+                      Afficher {Math.min(PAGE, liste.length - visibles)} de plus
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </Panneau>
+        }
+        detail={
+          selection != null ? (
+            <DetailOf key={selection} id={selection} risque={parId.get(selection)} />
           ) : (
-            <Vide raison="Sélectionnez un OF pour voir son avancement." />
-          )}
-        </div>
-      </div>
+            <Panneau titre="Détail">
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                Sélectionnez un OF pour voir son avancement.
+              </p>
+            </Panneau>
+          )
+        }
+      />
     </Page>
   )
 }
