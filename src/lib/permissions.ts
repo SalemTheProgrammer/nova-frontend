@@ -27,11 +27,21 @@ export function canAccessView(user: User | null, view: NavView): boolean {
   return requises.some((c) => CATEGORY_TOOLS[c]?.some((t) => autorises.has(t)))
 }
 
+/** Vrai pour l'admin ou un compte ayant au moins un outil de la catégorie
+ * (même règle que `require_category` côté backend). */
+export function hasCategory(user: User | null, categorie: string): boolean {
+  if (!user) return false
+  if (user.is_admin) return true
+  const autorises = new Set(user.outils_autorises)
+  return (CATEGORY_TOOLS[categorie] ?? []).some((t) => autorises.has(t))
+}
+
 /** Table catégorie -> noms d'outils, dérivée de `admin/tools` (voir
  * AdminUsersPage) mais dupliquée ici en dur : cette vérification tourne avant
  * tout appel réseau (garde de route), donc pas de dépendance à un fetch. */
 const CATEGORY_TOOLS: Record<string, string[]> = {
   Documents: ["rechercher_documents", "lister_documents_disponibles"],
+  Notifications: ["envoyer_message", "envoyer_document", "envoyer_rapport"],
   "Atelier Tunicotex": [
     "situation_atelier",
     "production_chaines",

@@ -260,6 +260,7 @@ function CarteRapport({
   description,
   parametres,
   prete = true,
+  libelles,
   children,
 }: {
   type: string
@@ -267,6 +268,7 @@ function CarteRapport({
   description: string
   parametres: ParametresRapport
   prete?: boolean
+  libelles?: Partial<Record<keyof ParametresRapport, string>>
   children: ReactNode
 }) {
   return (
@@ -278,7 +280,13 @@ function CarteRapport({
       <div className="space-y-3">{children}</div>
       <div className="flex flex-wrap items-center gap-2">
         <ApercuPremierePage type={type} parametres={parametres} prete={prete} />
-        <RapportActions type={type} parametres={parametres} libelle={titre} desactive={!prete} />
+        <RapportActions
+          type={type}
+          parametres={parametres}
+          libelle={titre}
+          desactive={!prete}
+          libelles={libelles}
+        />
       </div>
     </Card>
   )
@@ -357,6 +365,7 @@ export function RapportsPage() {
             au: periodeR2.au || undefined,
             of_id: ofR2?.id,
           }}
+          libelles={ofR2 ? { of_id: ofR2.numero } : undefined}
           prete={!!periodeR2.du}
         >
           <ChampsPeriode periode={periodeR2} />
@@ -423,6 +432,7 @@ export function RapportsPage() {
           titre="Avancement d'un OF"
           description="Avancement d'un OF par phase et par taille."
           parametres={{ of_id: ofR5?.id }}
+          libelles={ofR5 ? { of_id: ofR5.numero } : undefined}
           prete={!!ofR5}
         >
           <RechercheOf of={ofR5} onChange={setOfR5} obligatoire />

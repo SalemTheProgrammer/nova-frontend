@@ -2,7 +2,10 @@ import { useState } from "react"
 import { Download, Send } from "lucide-react"
 import { Button, Field, Modal, TextInput } from "@/components/shared/primitives"
 import { useToast } from "@/components/shared/Toast"
+import { useReference } from "@/components/tunicotex/useReference"
 import { getStoredUser } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
+import { hasCategory } from "@/lib/permissions"
 import { formatDateFr, tunicotexApi, type ParametresRapport } from "@/lib/tunicotex"
 
 const LIBELLES_PARAMETRES: Record<keyof ParametresRapport, string> = {
@@ -16,12 +19,14 @@ const LIBELLES_PARAMETRES: Record<keyof ParametresRapport, string> = {
   horizon_jours: "Horizon (jours)",
 }
 
-function resumeParametres(parametres: ParametresRapport): string[] {
+type Libelles = Partial<Record<keyof ParametresRapport, string>>
+
+function resumeParametres(parametres: ParametresRapport, libelles: Libelles): string[] {
   return (Object.keys(LIBELLES_PARAMETRES) as (keyof ParametresRapport)[])
     .filter((k) => parametres[k] !== undefined && parametres[k] !== null)
     .map((k) => {
       const v = parametres[k]
-      const texte = typeof v === "string" ? formatDateFr(v) : String(v)
+      const texte = libelles[k] ?? (typeof v === "string" ? formatDateFr(v) : String(v))
       return `${LIBELLES_PARAMETRES[k]} : ${texte}`
     })
 }
@@ -31,13 +36,19 @@ export function RapportActions({
   parametres,
   libelle,
   desactive = false,
+  libelles,
 }: {
   type: string
   parametres: ParametresRapport
   libelle?: string
   desactive?: boolean
+  /** Libellés lisibles des paramètres (ex. numéro d'OF) ; à défaut, les ids. */
+  libelles?: Libelles
 }) {
   const toast = useToast()
+  const { user } = useAuth()
+  const ref = useReference()
+  const peutEnvoyer = hasCategory(user, "Notifications")
   const [ouvert, setOuvert] = useState(false)
   const [destinataire, setDestinataire] = useState("")
   const [occupe, setOccupe] = useState(false)
@@ -84,7 +95,13 @@ export function RapportActions({
     }
   }
 
-  const lignes = resumeParametres(parametres)
+  const groupe = ref.groupes.find((g) => g.id === parametres.groupe_id)
+  const chaine = ref.lignes.find((l) => l.id === parametres.ligne_id)
+  const lignes = resumeParametres(parametres, {
+    ...(groupe ? { groupe_id: groupe.nom } : {}),
+    ...(chaine ? { ligne_id: chaine.code } : {}),
+    ...libelles,
+  })
 
   return (
     <>
@@ -93,10 +110,12 @@ export function RapportActions({
           <Download className="size-4" />
           PDF
         </Button>
-        <Button variant="outline" onClick={ouvrir} disabled={desactive}>
-          <Send className="size-4" />
-          Envoyer sur WhatsApp
-        </Button>
+        {peutEnvoyer && (
+          <Button variant="outline" onClick={ouvrir} disabled={desactive}>
+            <Send className="size-4" />
+            Envoyer sur WhatsApp
+          </Button>
+        )}
       </div>
       <Modal
         open={ouvert}

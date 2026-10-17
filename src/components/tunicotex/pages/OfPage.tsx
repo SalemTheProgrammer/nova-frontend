@@ -110,7 +110,12 @@ function DetailOf({ id, risque }: { id: number; risque: OFRisque | undefined }) 
           </div>
           <div className="flex flex-col items-end gap-2">
             <BadgeRisque risque={risque} />
-            <RapportActions type="R5" libelle="Rapport OF" parametres={{ of_id: o.id }} />
+            <RapportActions
+              type="R5"
+              libelle="Rapport OF"
+              parametres={{ of_id: o.id }}
+              libelles={{ of_id: o.numero }}
+            />
           </div>
         </div>
       </Card>
