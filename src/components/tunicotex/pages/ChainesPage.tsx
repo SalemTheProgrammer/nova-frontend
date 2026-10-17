@@ -97,13 +97,13 @@ function LigneChaine({
       <td className="max-w-40 truncate px-3 py-1.5 font-medium" title={l.ligne.nom}>
         {l.ligne.code || l.ligne.nom}
       </td>
-      <td className="max-w-32 truncate px-3 py-1.5">{l.ligne.groupe?.nom ?? "—"}</td>
-      <td className="px-3 py-1.5">{l.ligne.nature}</td>
-      <td className="px-3 py-1.5 text-right tabular-nums">{l.objectif ?? "—"}</td>
-      <td className="px-3 py-1.5 text-right tabular-nums">{l.sortie}</td>
-      <td className="px-3 py-1.5 text-right tabular-nums">{pct(l.taux)}</td>
-      <td className="px-3 py-1.5 text-right tabular-nums">{l.effectif}</td>
-      <td className="px-3 py-1.5 text-right tabular-nums">{pct(rendementDe(l))}</td>
+      <td className="hidden max-w-32 truncate px-3 py-1.5 2xl:table-cell">{l.ligne.groupe?.nom ?? "—"}</td>
+      <td className="hidden px-3 py-1.5 2xl:table-cell">{l.ligne.nature}</td>
+      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">{l.objectif ?? "—"}</td>
+      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">{l.sortie}</td>
+      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">{pct(l.taux)}</td>
+      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">{l.effectif}</td>
+      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">{pct(rendementDe(l))}</td>
       <td className="px-3 py-1.5">
         <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium", s.classe)}>
           {s.libelle}
@@ -161,10 +161,11 @@ export function ChainesPage() {
   }
 
   const suffixe = ref.calibre ? "" : " (estimé)"
-  const colonnes: { cle: Cle; titre: string; droite?: boolean }[] = [
+  // `large` : colonne masquée sous 1536 px (le groupe se lit déjà dans le code de la chaîne).
+  const colonnes: { cle: Cle; titre: string; droite?: boolean; large?: boolean }[] = [
     { cle: "code", titre: "Code" },
-    { cle: "groupe", titre: "Groupe" },
-    { cle: "nature", titre: "Nature" },
+    { cle: "groupe", titre: "Groupe", large: true },
+    { cle: "nature", titre: "Nature", large: true },
     { cle: "objectif", titre: "Objectif", droite: true },
     { cle: "sortie", titre: "Sortie", droite: true },
     { cle: "taux", titre: "Taux", droite: true },
@@ -222,7 +223,11 @@ export function ChainesPage() {
                         key={c.cle}
                         scope="col"
                         aria-sort={tri.cle === c.cle ? (tri.asc ? "ascending" : "descending") : "none"}
-                        className={cn("whitespace-nowrap px-3 py-2 font-medium", c.droite && "text-right")}
+                        className={cn(
+                          "whitespace-nowrap px-3 py-2 font-medium",
+                          c.droite && "text-right",
+                          c.large && "hidden 2xl:table-cell",
+                        )}
                       >
                         <button
                           type="button"

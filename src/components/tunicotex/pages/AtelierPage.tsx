@@ -5,6 +5,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -354,6 +355,7 @@ export function AtelierPage() {
                         interval={0}
                       />
                       <Tooltip />
+                      <Legend verticalAlign="top" height={22} iconSize={9} wrapperStyle={{ fontSize: 11 }} />
                       <Bar
                         dataKey="sortie"
                         name="Sortie"
