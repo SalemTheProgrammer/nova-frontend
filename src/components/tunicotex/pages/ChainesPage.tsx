@@ -1,7 +1,11 @@
 import { useMemo, useState } from "react"
-import { ArrowDown, ArrowUp } from "lucide-react"
+import { useSearchParams } from "react-router-dom"
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight } from "lucide-react"
 import { Page, Select, TextInput } from "@/components/shared/primitives"
-import { ChaineDetail } from "@/components/tunicotex/ChaineDetail"
+import { ChaineDetailPanneau } from "@/components/tunicotex/ChaineDetail"
+import { DateDonnees } from "@/components/tunicotex/DateDonnees"
+import { MaitreDetail } from "@/components/tunicotex/MaitreDetail"
+import { Panneau } from "@/components/tunicotex/Panneau"
 import { Chargement, ErreurDivatex, Vide } from "@/components/tunicotex/EtatsDonnees"
 import { useReference } from "@/components/tunicotex/useReference"
 import { comparerValeurs, messageErreur, pct } from "@/components/tunicotex/format"
@@ -64,12 +68,59 @@ function valeur(l: ProductionLigne, cle: Cle): string | number | null {
   }
 }
 
+function LigneChaine({
+  l,
+  active,
+  onChoisir,
+}: {
+  l: ProductionLigne
+  active: boolean
+  onChoisir: (id: number) => void
+}) {
+  const s = statutDe(l)
+  return (
+    <tr
+      tabIndex={0}
+      aria-selected={active}
+      onClick={() => onChoisir(l.ligne.id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault()
+          onChoisir(l.ligne.id)
+        }
+      }}
+      className={cn(
+        "cursor-pointer border-t border-border/60 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none",
+        active && "bg-accent/70",
+      )}
+    >
+      <td className="max-w-40 truncate px-3 py-1.5 font-medium" title={l.ligne.nom}>
+        {l.ligne.code || l.ligne.nom}
+      </td>
+      <td className="max-w-32 truncate px-3 py-1.5">{l.ligne.groupe?.nom ?? "—"}</td>
+      <td className="px-3 py-1.5">{l.ligne.nature}</td>
+      <td className="px-3 py-1.5 text-right tabular-nums">{l.objectif ?? "—"}</td>
+      <td className="px-3 py-1.5 text-right tabular-nums">{l.sortie}</td>
+      <td className="px-3 py-1.5 text-right tabular-nums">{pct(l.taux)}</td>
+      <td className="px-3 py-1.5 text-right tabular-nums">{l.effectif}</td>
+      <td className="px-3 py-1.5 text-right tabular-nums">{pct(rendementDe(l))}</td>
+      <td className="px-3 py-1.5">
+        <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium", s.classe)}>
+          {s.libelle}
+        </span>
+      </td>
+    </tr>
+  )
+}
+
 export function ChainesPage() {
   const ref = useReference()
   const [dateChoisie, setDateChoisie] = useState("")
   const [groupe, setGroupe] = useState("")
-  const [tri, setTri] = useState<{ cle: Cle; asc: boolean }>({ cle: "code", asc: true })
-  const [ouverte, setOuverte] = useState<number | null>(null)
+  // Par défaut : les chaînes les plus en retard en premier.
+  const [tri, setTri] = useState<{ cle: Cle; asc: boolean }>({ cle: "taux", asc: true })
+  const [sansLectureOuvert, setSansLectureOuvert] = useState(false)
+  const [params, setParams] = useSearchParams()
   const jour = dateChoisie || ref.dateReference
 
   const chaines = useResource(
@@ -87,6 +138,23 @@ export function ChainesPage() {
     })
     return copie
   }, [chaines.data, tri])
+  const avecLectures = lignes.filter((l) => l.a_des_lectures)
+  const sansLecture = lignes.filter((l) => !l.a_des_lectures)
+
+  const idParam = Number(params.get("id"))
+  const choisie =
+    Number.isFinite(idParam) && idParam > 0 && lignes.some((l) => l.ligne.id === idParam)
+      ? idParam
+      : // Défaut : la chaîne au plus faible taux parmi celles qui ont un objectif.
+        ([...avecLectures]
+          .filter((l) => l.taux != null)
+          .sort((a, b) => (a.taux ?? 0) - (b.taux ?? 0))[0]?.ligne.id ??
+        avecLectures[0]?.ligne.id ??
+        null)
+
+  function choisir(id: number) {
+    setParams({ id: String(id) }, { replace: true })
+  }
 
   function trier(cle: Cle) {
     setTri((t) => (t.cle === cle ? { cle, asc: !t.asc } : { cle, asc: true }))
@@ -106,8 +174,8 @@ export function ChainesPage() {
   ]
 
   return (
-    <Page title="Chaînes" description="Production par chaîne">
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+    <Page fullHeight title="Chaînes" description="Production par chaîne" meta={<DateDonnees />}>
+      <div className="mb-3 flex shrink-0 flex-wrap items-center gap-3">
         <TextInput
           type="date"
           aria-label="Date"
@@ -143,74 +211,80 @@ export function ChainesPage() {
       ) : lignes.length === 0 ? (
         <Vide raison="Aucune chaîne pour ce jour." />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
-              <tr>
-                {colonnes.map((c) => (
-                  <th
-                    key={c.cle}
-                    scope="col"
-                    aria-sort={tri.cle === c.cle ? (tri.asc ? "ascending" : "descending") : "none"}
-                    className={cn("px-3 py-2 font-medium", c.droite && "text-right")}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => trier(c.cle)}
-                      className="inline-flex items-center gap-1 hover:text-foreground"
-                    >
-                      {c.titre}
-                      {tri.cle === c.cle &&
-                        (tri.asc ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />)}
-                    </button>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {lignes.map((l) => {
-                const s = statutDe(l)
-                return (
-                  <tr
-                    key={l.ligne.id}
-                    tabIndex={0}
-                    role="button"
-                    onClick={() => setOuverte(l.ligne.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault()
-                        setOuverte(l.ligne.id)
-                      }
-                    }}
-                    className="cursor-pointer border-t border-border/60 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
-                  >
-                    <td className="px-3 py-2 font-medium">{l.ligne.code || l.ligne.nom}</td>
-                    <td className="px-3 py-2">{l.ligne.groupe?.nom ?? "—"}</td>
-                    <td className="px-3 py-2">{l.ligne.nature}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{l.objectif ?? "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{l.sortie}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{pct(l.taux)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{l.effectif}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{pct(rendementDe(l))}</td>
-                    <td className="px-3 py-2">
-                      <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", s.classe)}>
-                        {s.libelle}
-                      </span>
-                    </td>
+        <MaitreDetail
+          maitre={
+            <Panneau titre="Chaînes" compteur={lignes.length} corpsClassName="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-card text-left text-xs text-muted-foreground">
+                  <tr>
+                    {colonnes.map((c) => (
+                      <th
+                        key={c.cle}
+                        scope="col"
+                        aria-sort={tri.cle === c.cle ? (tri.asc ? "ascending" : "descending") : "none"}
+                        className={cn("whitespace-nowrap px-3 py-2 font-medium", c.droite && "text-right")}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => trier(c.cle)}
+                          className="inline-flex items-center gap-1 hover:text-foreground"
+                        >
+                          {c.titre}
+                          {tri.cle === c.cle &&
+                            (tri.asc ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />)}
+                        </button>
+                      </th>
+                    ))}
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {avecLectures.map((l) => (
+                    <LigneChaine
+                      key={l.ligne.id}
+                      l={l}
+                      active={l.ligne.id === choisie}
+                      onChoisir={choisir}
+                    />
+                  ))}
+                  {sansLecture.length > 0 && (
+                    <tr className="border-t border-border/60">
+                      <td colSpan={colonnes.length} className="px-3 py-1.5">
+                        <button
+                          type="button"
+                          aria-expanded={sansLectureOuvert}
+                          onClick={() => setSansLectureOuvert((o) => !o)}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                        >
+                          {sansLectureOuvert ? (
+                            <ChevronDown className="size-3.5" />
+                          ) : (
+                            <ChevronRight className="size-3.5" />
+                          )}
+                          Sans lecture ({sansLecture.length})
+                        </button>
+                      </td>
+                    </tr>
+                  )}
+                  {sansLectureOuvert &&
+                    sansLecture.map((l) => (
+                      <LigneChaine
+                        key={l.ligne.id}
+                        l={l}
+                        active={l.ligne.id === choisie}
+                        onChoisir={choisir}
+                      />
+                    ))}
+                </tbody>
+              </table>
+            </Panneau>
+          }
+          detail={
+            choisie != null ? (
+              <ChaineDetailPanneau key={choisie} id={choisie} jour={jour} calibre={ref.calibre} />
+            ) : undefined
+          }
+        />
       )}
-
-      <ChaineDetail
-        id={ouverte}
-        jour={jour}
-        calibre={ref.calibre}
-        onFermer={() => setOuverte(null)}
-      />
     </Page>
   )
 }
