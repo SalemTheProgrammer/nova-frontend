@@ -6,14 +6,11 @@ RUN npm ci
 
 COPY . .
 
-# Variables Vite figées au build. VITE_WS_BASE est facultatif : par défaut le
-# WebSocket vise l'origine de la page (/ws/…), relayée par nginx.
+# Variables Vite figées au build.
 ARG VITE_API_BASE=/api/v1
 ARG VITE_API_KEY
-ARG VITE_WS_BASE
 ENV VITE_API_BASE=$VITE_API_BASE \
-    VITE_API_KEY=$VITE_API_KEY \
-    VITE_WS_BASE=$VITE_WS_BASE
+    VITE_API_KEY=$VITE_API_KEY
 
 RUN npm run build
 
