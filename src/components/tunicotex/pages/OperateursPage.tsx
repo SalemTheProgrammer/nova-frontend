@@ -1,6 +1,5 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { useSearchParams } from "react-router-dom"
-import { Dialog } from "radix-ui"
 import {
   Bar,
   BarChart,
@@ -12,12 +11,16 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
-import { ArrowDown, ArrowUp, X } from "lucide-react"
-import { Card, Page, Select, TextInput } from "@/components/shared/primitives"
+import { ArrowDown, ArrowUp, Search, X } from "lucide-react"
+import { Button, Page, Select, TextInput } from "@/components/shared/primitives"
 import { Chargement, ErreurDivatex, Vide } from "@/components/tunicotex/EtatsDonnees"
+import { DateDonnees } from "@/components/tunicotex/DateDonnees"
+import { MaitreDetail } from "@/components/tunicotex/MaitreDetail"
+import { Panneau } from "@/components/tunicotex/Panneau"
 import { RapportActions } from "@/components/tunicotex/RapportActions"
 import { comparerValeurs, messageErreur, pct } from "@/components/tunicotex/format"
 import { useReference } from "@/components/tunicotex/useReference"
+import { useDebounce } from "@/lib/useDebounce"
 import { useResource } from "@/lib/useResource"
 import { formatDateFr, tunicotexApi, type RendementOperateur } from "@/lib/tunicotex"
 import { cn } from "@/lib/utils"
@@ -25,6 +28,8 @@ import { cn } from "@/lib/utils"
 const JOURS_MAX = 31
 const MS_JOUR = 86_400_000
 const MESSAGE_PERIODE = "Période limitée à 31 jours."
+/** Lignes affichées d'un coup ; « Afficher plus » ajoute la page suivante. */
+const PAGE = 50
 
 function ajouterJours(iso: string, n: number): string {
   const d = new Date(`${iso}T00:00:00Z`)
@@ -38,6 +43,10 @@ function ecartJours(du: string, au: string): number {
 
 /** Erreur 400 du serveur sur la durée de la période (affichée sous le sélecteur). */
 const estErreurPeriode = (e: string | null): boolean => !!e && /p[ée]riode/i.test(e)
+
+/** Minuscules sans accents, pour une recherche tolérante. */
+const normaliser = (s: string): string =>
+  s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
 
 type Cle = "rang" | "matricule" | "nom" | "chaine" | "pieces" | "minutes" | "presence" | "rendement"
 
@@ -81,6 +90,18 @@ function histogramme(ops: RendementOperateur[]): { tranche: string; operateurs: 
   }))
 }
 
+/** Graduations lisibles de l'histogramme : 0, 50, 100, ≥ 150 %. */
+const GRADUATIONS: Record<number, string> = { 0: "0 %", 5: "50 %", 10: "100 %", 15: "≥ 150 %" }
+
+function Section({ titre, children }: { titre: string; children: ReactNode }) {
+  return (
+    <div>
+      <h3 className="mb-2 text-xs font-medium text-muted-foreground">{titre}</h3>
+      {children}
+    </div>
+  )
+}
+
 function Fiche({
   id,
   du,
@@ -105,95 +126,92 @@ function Fiche({
   const maxQte = top.reduce((m, [, q]) => Math.max(m, q), 0)
 
   return (
-    <>
-      <div className="flex items-start justify-between gap-3 border-b border-border/80 px-5 py-4">
-        <div className="min-w-0">
-          <Dialog.Title className="truncate text-base font-bold tracking-tight">
-            {f ? nomComplet(f.total) : "Opérateur"}
-          </Dialog.Title>
-          <Dialog.Description className="text-xs text-muted-foreground">
-            {f ? `${f.operateur.matricule}${f.total.ligne ? ` · ${f.total.ligne}` : ""} · ` : ""}
-            Du {formatDateFr(du)} au {formatDateFr(au)}
-          </Dialog.Description>
-        </div>
+    <Panneau
+      titre={f ? nomComplet(f.total) : "Opérateur"}
+      extra={
         <button
           type="button"
           onClick={onFermer}
-          aria-label="Fermer"
-          className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          aria-label="Fermer la fiche"
+          className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <X className="size-4" />
         </button>
-      </div>
-
-      <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
-        {fiche.loading ? (
-          <Chargement />
-        ) : fiche.error ? (
-          <ErreurDivatex onRetry={() => void fiche.reload()} message={messageErreur(fiche.error)} />
-        ) : f ? (
-          <>
-            <p className="text-sm tabular-nums text-muted-foreground">
-              {f.total.pieces_operations} opérations · {minutes(f.total.minutes_produites)} produites
-              · présence {minutes(f.total.minutes_presence)}
-              {f.total.presence_estimee && " (estimée)"} · Rendement{suffixe} {pct(f.total.rendement)}
+      }
+      corpsClassName="space-y-5 px-4 py-3"
+    >
+      {fiche.loading ? (
+        <Chargement />
+      ) : fiche.error ? (
+        <ErreurDivatex onRetry={() => void fiche.reload()} message={messageErreur(fiche.error)} />
+      ) : f ? (
+        <>
+          <div className="space-y-0.5 text-sm tabular-nums text-muted-foreground">
+            <p>
+              {f.operateur.matricule}
+              {f.total.ligne ? ` · ${f.total.ligne}` : ""} · du {formatDateFr(du)} au{" "}
+              {formatDateFr(au)}
             </p>
+            <p>
+              {f.total.pieces_operations} opérations · {minutes(f.total.minutes_produites)}{" "}
+              produites · présence {minutes(f.total.minutes_presence)}
+              {f.total.presence_estimee && " (estimée)"} · Rendement{suffixe}{" "}
+              <span className="font-medium text-foreground">{pct(f.total.rendement)}</span>
+            </p>
+          </div>
 
-            <Card className="min-w-0 p-4">
-              <h3 className="mb-3 text-sm font-medium">Rendement{suffixe} par jour</h3>
-              {courbe.every((p) => p.rendement == null) ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  Aucune lecture sur la période.
-                </p>
-              ) : (
-                <div className="h-48 min-w-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={courbe}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="jour" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} width={44} unit=" %" />
-                      <Tooltip formatter={(v) => (v == null ? "—" : `${v} %`)} />
-                      <Line
-                        type="monotone"
-                        dataKey="rendement"
-                        name="Rendement"
-                        stroke="var(--chart-2)"
-                        strokeWidth={2}
-                        connectNulls={false}
+          <Section titre={`Rendement${suffixe} par jour`}>
+            {courbe.every((p) => p.rendement == null) ? (
+              <p className="py-4 text-sm text-muted-foreground">Aucune lecture sur la période.</p>
+            ) : (
+              <div className="h-36 min-w-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={courbe}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="jour" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} width={44} unit=" %" />
+                    <Tooltip formatter={(v) => (v == null ? "—" : `${v} %`)} />
+                    <Line
+                      type="monotone"
+                      dataKey="rendement"
+                      name="Rendement"
+                      stroke="var(--chart-2)"
+                      strokeWidth={2}
+                      connectNulls={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </Section>
+
+          <Section titre="Opérations réalisées">
+            {top.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Aucune opération sur la période.</p>
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {top.map(([libelle, qte]) => (
+                  <li key={libelle}>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="min-w-0 truncate" title={libelle}>
+                        {libelle}
+                      </span>
+                      <span className="shrink-0 tabular-nums text-muted-foreground">{qte}</span>
+                    </div>
+                    <div className="mt-1 h-1.5 rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-[var(--chart-2)]"
+                        style={{ width: `${maxQte > 0 ? (qte / maxQte) * 100 : 0}%` }}
                       />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </Card>
-
-            <Card className="min-w-0 p-4">
-              <h3 className="mb-2 text-sm font-medium">Opérations réalisées</h3>
-              {top.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Aucune opération sur la période.</p>
-              ) : (
-                <ul className="space-y-2 text-sm">
-                  {top.map(([libelle, qte]) => (
-                    <li key={libelle}>
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="min-w-0 truncate">{libelle}</span>
-                        <span className="shrink-0 tabular-nums text-muted-foreground">{qte}</span>
-                      </div>
-                      <div className="mt-1 h-1.5 rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-[var(--chart-2)]"
-                          style={{ width: `${maxQte > 0 ? (qte / maxQte) * 100 : 0}%` }}
-                        />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          </>
-        ) : null}
-      </div>
-    </>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+        </>
+      ) : null}
+    </Panneau>
   )
 }
 
@@ -207,6 +225,9 @@ export function OperateursPage() {
   const [auChoisi, setAuChoisi] = useState("")
   const [groupe, setGroupe] = useState("")
   const [chaine, setChaine] = useState("")
+  const [saisie, setSaisie] = useState("")
+  const recherche = useDebounce(normaliser(saisie.trim()), 200)
+  const [visibles, setVisibles] = useState(PAGE)
   const [tri, setTri] = useState<{ cle: Cle; asc: boolean }>({ cle: "rang", asc: true })
 
   const au = auChoisi || ref.dateReference
@@ -247,12 +268,18 @@ export function OperateursPage() {
   }, [ops.data])
 
   const lignes = useMemo(() => {
-    const copie = [...classes]
-    copie.sort((a, b) => {
-      return comparerValeurs(valeur(a.o, a.rang, tri.cle), valeur(b.o, b.rang, tri.cle), tri.asc)
-    })
-    return copie
-  }, [classes, tri])
+    const filtrees = recherche
+      ? classes.filter(({ o }) =>
+          normaliser(`${nomComplet(o)} ${o.operateur.matricule}`).includes(recherche),
+        )
+      : classes
+    return [...filtrees].sort((a, b) =>
+      comparerValeurs(valeur(a.o, a.rang, tri.cle), valeur(b.o, b.rang, tri.cle), tri.asc),
+    )
+  }, [classes, tri, recherche])
+
+  // Nouvelle période, recherche ou tri : on repart des premières lignes.
+  useEffect(() => setVisibles(PAGE), [ops.data, recherche, tri])
 
   const histo = useMemo(() => histogramme(ops.data ?? []), [ops.data])
 
@@ -280,8 +307,27 @@ export function OperateursPage() {
   ]
 
   return (
-    <Page title="Opérateurs" description="Rendement des opérateurs sur une période">
-      <div className="mb-1 flex flex-wrap items-center gap-3">
+    <Page
+      fullHeight
+      title="Opérateurs"
+      description="Rendement des opérateurs sur une période"
+      meta={<DateDonnees />}
+      actions={
+        periodeValide && !messagePeriode ? (
+          <RapportActions
+            type="R3"
+            libelle="Rendement opérateurs"
+            parametres={{
+              du,
+              au,
+              ligne_id: chaine ? Number(chaine) : null,
+              groupe_id: groupe ? Number(groupe) : null,
+            }}
+          />
+        ) : undefined
+      }
+    >
+      <div className="mb-3 flex shrink-0 flex-wrap items-center gap-3">
         <TextInput
           type="date"
           aria-label="Du"
@@ -329,27 +375,23 @@ export function OperateursPage() {
             </option>
           ))}
         </Select>
-        {periodeValide && !messagePeriode && (
-          <div className="ml-auto">
-            <RapportActions
-              type="R3"
-              libelle="Rendement opérateurs"
-              parametres={{
-                du,
-                au,
-                ligne_id: chaine ? Number(chaine) : null,
-                groupe_id: groupe ? Number(groupe) : null,
-              }}
-            />
-          </div>
+        <div className="relative min-w-48 flex-1 sm:max-w-64">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <TextInput
+            type="search"
+            aria-label="Rechercher un opérateur"
+            placeholder="Nom ou matricule…"
+            className="pl-9"
+            value={saisie}
+            onChange={(e) => setSaisie(e.target.value)}
+          />
+        </div>
+        {messagePeriode && (
+          <p role="alert" className="basis-full text-sm text-destructive">
+            {messagePeriode}
+          </p>
         )}
       </div>
-      <p
-        role="alert"
-        className={cn("mb-4 min-h-5 text-sm text-destructive", !messagePeriode && "invisible")}
-      >
-        {messagePeriode ?? " "}
-      </p>
 
       {ref.loading || (ops.loading && periodeValide) ? (
         <Chargement />
@@ -363,104 +405,141 @@ export function OperateursPage() {
           }}
           message={messageErreur(ops.error ?? ref.error)}
         />
-      ) : lignes.length === 0 ? (
+      ) : classes.length === 0 ? (
         <Vide raison="Aucun opérateur sur cette période." />
       ) : (
-        <div className="space-y-4">
-          <Card className="min-w-0 p-4">
-            <h3 className="mb-3 text-sm font-medium">Répartition des rendements{suffixe}</h3>
-            <div className="h-52 min-w-0">
+        <div className="flex min-w-0 flex-col gap-3 lg:min-h-0 lg:flex-1">
+          <section className="shrink-0 rounded-xl border border-border bg-card px-4 pb-1 pt-2">
+            <h2 className="text-xs font-medium text-muted-foreground">
+              Répartition des rendements{suffixe}
+            </h2>
+            <div className="h-24 min-w-0">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={histo}>
+                <BarChart data={histo} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis
                     dataKey="tranche"
                     tick={{ fontSize: 10 }}
                     interval={0}
-                    angle={-35}
-                    textAnchor="end"
-                    height={56}
+                    tickFormatter={(_v, i) => GRADUATIONS[i] ?? ""}
+                    height={16}
                   />
-                  <YAxis tick={{ fontSize: 11 }} width={32} allowDecimals={false} />
+                  <YAxis tick={{ fontSize: 10 }} width={28} allowDecimals={false} />
                   <Tooltip />
                   <Bar dataKey="operateurs" name="Opérateurs" fill="var(--chart-2)" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </Card>
+          </section>
 
-          <div className="overflow-x-auto rounded-xl border border-border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
-                <tr>
-                  {colonnes.map((c) => (
-                    <th
-                      key={c.cle}
-                      scope="col"
-                      aria-sort={tri.cle === c.cle ? (tri.asc ? "ascending" : "descending") : "none"}
-                      className={cn("px-3 py-2 font-medium", c.droite && "text-right")}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => trier(c.cle)}
-                        className="inline-flex items-center gap-1 hover:text-foreground"
-                      >
-                        {c.titre}
-                        {tri.cle === c.cle &&
-                          (tri.asc ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />)}
-                      </button>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {lignes.map(({ o, rang }) => (
-                  <tr
-                    key={o.operateur.id}
-                    tabIndex={0}
-                    role="button"
-                    onClick={() => ouvrir(o.operateur.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault()
-                        ouvrir(o.operateur.id)
-                      }
-                    }}
-                    className="cursor-pointer border-t border-border/60 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
-                  >
-                    <td className="px-3 py-2 tabular-nums text-muted-foreground">{rang}</td>
-                    <td className="px-3 py-2 tabular-nums">{o.operateur.matricule}</td>
-                    <td className="px-3 py-2 font-medium">{nomComplet(o)}</td>
-                    <td className="px-3 py-2">{o.ligne ?? "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{o.pieces_operations}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{minutes(o.minutes_produites)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {minutes(o.minutes_presence)}
-                      {o.presence_estimee && (
-                        <span className="ml-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
-                          estimée
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums">{pct(o.rendement)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <MaitreDetail
+            detail={
+              ouvert != null && du && au ? (
+                <Fiche
+                  key={`${ouvert}-${du}-${au}`}
+                  id={ouvert}
+                  du={du}
+                  au={au}
+                  calibre={ref.calibre}
+                  onFermer={() => ouvrir(null)}
+                />
+              ) : undefined
+            }
+            maitre={
+              <Panneau titre="Classement" compteur={lignes.length} corpsClassName="overflow-x-auto">
+                {lignes.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-muted-foreground">
+                    Aucun opérateur ne correspond à « {saisie.trim()} ».
+                  </p>
+                ) : (
+                  <>
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 z-10 bg-card text-left text-xs text-muted-foreground">
+                        <tr>
+                          {colonnes.map((c) => (
+                            <th
+                              key={c.cle}
+                              scope="col"
+                              aria-sort={
+                                tri.cle === c.cle ? (tri.asc ? "ascending" : "descending") : "none"
+                              }
+                              className={cn(
+                                "whitespace-nowrap px-3 py-2 font-medium",
+                                c.droite && "text-right",
+                              )}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => trier(c.cle)}
+                                className="inline-flex items-center gap-1 hover:text-foreground"
+                              >
+                                {c.titre}
+                                {tri.cle === c.cle &&
+                                  (tri.asc ? (
+                                    <ArrowUp className="size-3" />
+                                  ) : (
+                                    <ArrowDown className="size-3" />
+                                  ))}
+                              </button>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {lignes.slice(0, visibles).map(({ o, rang }) => (
+                          <tr
+                            key={o.operateur.id}
+                            tabIndex={0}
+                            aria-selected={o.operateur.id === ouvert}
+                            onClick={() => ouvrir(o.operateur.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault()
+                                ouvrir(o.operateur.id)
+                              }
+                            }}
+                            className={cn(
+                              "cursor-pointer border-t border-border/60 hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none",
+                              o.operateur.id === ouvert && "bg-accent/70",
+                            )}
+                          >
+                            <td className="px-3 py-1.5 tabular-nums text-muted-foreground">{rang}</td>
+                            <td className="px-3 py-1.5 tabular-nums">{o.operateur.matricule}</td>
+                            <td className="max-w-48 truncate px-3 py-1.5 font-medium" title={nomComplet(o)}>
+                              {nomComplet(o)}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-1.5">{o.ligne ?? "—"}</td>
+                            <td className="px-3 py-1.5 text-right tabular-nums">{o.pieces_operations}</td>
+                            <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
+                              {minutes(o.minutes_produites)}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
+                              {minutes(o.minutes_presence)}
+                              {o.presence_estimee && (
+                                <span className="ml-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                                  estimée
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-1.5 text-right tabular-nums">{pct(o.rendement)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {visibles < lignes.length && (
+                      <div className="border-t border-border/60 p-2 text-center">
+                        <Button variant="ghost" onClick={() => setVisibles((v) => v + PAGE)}>
+                          Afficher {Math.min(PAGE, lignes.length - visibles)} de plus
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </Panneau>
+            }
+          />
         </div>
       )}
-
-      <Dialog.Root open={ouvert != null} onOpenChange={(o) => !o && ouvrir(null)}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
-          <Dialog.Content className="fixed inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col border-l border-border/80 bg-card shadow-2xl outline-none">
-            {ouvert != null && du && au && (
-              <Fiche id={ouvert} du={du} au={au} calibre={ref.calibre} onFermer={() => ouvrir(null)} />
-            )}
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
     </Page>
   )
 }
