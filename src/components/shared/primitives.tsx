@@ -45,7 +45,7 @@ export function Page({
                 <p className="hidden truncate text-sm text-muted-foreground xl:block">{description}</p>
               )}
             </div>
-            {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+            {actions && <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>}
           </div>
         )}
         <div className="flex min-w-0 flex-col lg:min-h-0 lg:flex-1">{children}</div>

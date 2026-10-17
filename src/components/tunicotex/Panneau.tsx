@@ -5,7 +5,8 @@ import { cn } from "@/lib/utils"
 
 /**
  * Carte d'écran : en-tête sur une ligne, corps qui défile dans la carte à partir
- * de `lg` (la page, elle, ne défile plus). En dessous de `lg`, flux normal.
+ * de `lg` (la page, elle, ne défile plus). En dessous de `lg`, le corps est plafonné
+ * à 70 % de la hauteur d'écran pour que les longues listes ne déroulent pas la page.
  */
 export function Panneau({
   titre,
@@ -31,14 +32,14 @@ export function Panneau({
         className,
       )}
     >
-      <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-border/70 px-4 py-2">
+      <header className="flex min-h-11 shrink-0 flex-wrap items-center gap-2 border-b border-border/70 px-4 py-2">
         <h2 className="min-w-0 truncate text-sm font-medium">{titre}</h2>
         {compteur != null && (
           <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
             {compteur}
           </span>
         )}
-        <div className="ml-auto flex shrink-0 items-center gap-3">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
           {extra}
           {action && (
             <Link
@@ -51,7 +52,7 @@ export function Panneau({
           )}
         </div>
       </header>
-      <div className={cn("min-h-0 flex-1 lg:overflow-auto", corpsClassName)}>{children}</div>
+      <div className={cn("min-h-0 flex-1 overflow-auto max-lg:max-h-[70dvh]", corpsClassName)}>{children}</div>
     </section>
   )
 }

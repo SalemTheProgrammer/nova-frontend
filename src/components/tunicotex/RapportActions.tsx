@@ -105,7 +105,7 @@ export function RapportActions({
 
   return (
     <>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" onClick={telecharger} disabled={occupe || desactive}>
           <Download className="size-4" />
           PDF
