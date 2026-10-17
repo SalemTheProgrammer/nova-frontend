@@ -1,3 +1,5 @@
+import type { ProductionLigne } from "@/lib/tunicotex"
+
 /** Fraction 0–1 -> « 85 % » (« — » si absente). */
 export const pct = (f: number | null): string => (f == null ? "—" : `${Math.round(f * 100)} %`)
 
@@ -19,4 +21,24 @@ export function comparerValeurs(
   const c =
     typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b), "fr")
   return asc ? c : -c
+}
+
+export type RaisonVerification = "sans_lecture" | "objectif_ancien" | "taux_aberrant"
+
+/** Taux au-delà duquel le chiffre n'est pas crédible (objectif périmé ou mal saisi). */
+const TAUX_ABERRANT = 2
+
+/** Pourquoi une chaîne est exclue des comparaisons sortie / objectif, ou `null`. */
+export function aVerifier(l: ProductionLigne): RaisonVerification | null {
+  if (!l.a_des_lectures) return "sans_lecture"
+  if (l.objectif_perime) return "objectif_ancien"
+  if (l.taux != null && l.taux > TAUX_ABERRANT) return "taux_aberrant"
+  return null
+}
+
+/** Exclue du graphique sortie / objectif : sans lecture ou taux non crédible. Un objectif
+ * ancien reste comparé (c'est le cas de la plupart des chaînes) mais est signalé. */
+export function exclueDuGraphique(l: ProductionLigne): boolean {
+  const r = aVerifier(l)
+  return r === "sans_lecture" || r === "taux_aberrant"
 }

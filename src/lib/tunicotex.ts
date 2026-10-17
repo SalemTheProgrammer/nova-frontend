@@ -199,8 +199,12 @@ export interface Tuile {
   libelle: string
   valeur: string | number | null
   unite?: string
-  etat?: "ok" | "alerte" | "neutre"
+  etat?: "ok" | "attention" | "alerte" | "neutre"
   note?: string
+  /** Tuile mise en avant (écran Atelier). */
+  principale?: boolean
+  /** Mini-courbe (valeurs brutes, ordre chronologique). */
+  courbe?: number[]
 }
 
 /** Phase d'un artifact `phase_pipeline`. */

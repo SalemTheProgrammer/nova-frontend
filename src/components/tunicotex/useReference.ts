@@ -14,6 +14,11 @@ function chargerReference(): Promise<Reference> {
   return cache
 }
 
+/** Oublie la référence en cache : le prochain `reload()` la relit (rafraîchissement auto). */
+export function oublierReference(): void {
+  cache = null
+}
+
 export function useReference() {
   const { data, loading, error, reload } = useResource(chargerReference, [])
   return {

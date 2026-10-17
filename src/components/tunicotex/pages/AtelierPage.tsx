@@ -1,42 +1,55 @@
-import { useMemo, useState } from "react"
-import { Link } from "react-router-dom"
+import { useEffect, useMemo, useState } from "react"
+import { Link, useNavigate } from "react-router-dom"
 import {
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
-  Legend,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts"
-import { Sparkles } from "lucide-react"
-import { Button, Card, Page, Select, TextInput } from "@/components/shared/primitives"
+import { ArrowRight, Sparkles } from "lucide-react"
+import { Button, Page, Select, TextInput } from "@/components/shared/primitives"
+import { DateDonnees } from "@/components/tunicotex/DateDonnees"
+import { DonneesAVerifier } from "@/components/tunicotex/DonneesAVerifier"
+import { exclueDuGraphique } from "@/components/tunicotex/format"
 import { KpiTiles } from "@/components/tunicotex/KpiTiles"
+import { Panneau } from "@/components/tunicotex/Panneau"
 import { RapportActions } from "@/components/tunicotex/RapportActions"
 import { Chargement, ErreurDivatex, Vide } from "@/components/tunicotex/EtatsDonnees"
-import { useReference } from "@/components/tunicotex/useReference"
+import { oublierReference, useReference } from "@/components/tunicotex/useReference"
 import { aiChatBus } from "@/lib/aiChatBus"
 import { useResource } from "@/lib/useResource"
 import {
   formatDateFr,
   tunicotexApi,
+  type OFRisque,
   type ProductionLigne,
   type Tuile,
 } from "@/lib/tunicotex"
+import { cn } from "@/lib/utils"
 
 const ROUGE = "var(--destructive)"
 const NEUTRE = "var(--chart-2)"
 const OBJECTIF = "var(--chart-1)"
+const RAFRAICHISSEMENT_MS = 5 * 60_000
 
 const pct = (f: number | null): string => (f == null ? "—" : `${Math.round(f * 100)} %`)
 const jjmm = (iso: string): string => formatDateFr(iso).slice(0, 5)
 
-function sousObjectif(l: ProductionLigne): boolean {
-  return l.objectif != null && l.objectif > 0 && l.sortie < l.objectif
+/** Seuils de la tuile Taux d'atteinte (décision de design, spec § 9). */
+function etatTaux(taux: number | null): Tuile["etat"] {
+  if (taux == null) return "neutre"
+  if (taux >= 0.95) return "ok"
+  if (taux >= 0.8) return "attention"
+  return "alerte"
+}
+
+/** Chaîne comparable sortie / objectif : lectures, objectif, taux crédible. */
+function comparable(l: ProductionLigne): boolean {
+  return l.objectif != null && l.objectif > 0 && !exclueDuGraphique(l)
 }
 
 function messageErreur(erreur: string | null): string | undefined {
@@ -44,33 +57,55 @@ function messageErreur(erreur: string | null): string | undefined {
   return erreur
 }
 
-function ListeClassement({ titre, lignes }: { titre: string; lignes: ProductionLigne[] }) {
+/** 5 éléments par liste, 10 quand la fenêtre est haute. */
+function useTailleListe(): number {
+  const requete = "(min-height: 900px)"
+  const [haute, setHaute] = useState(() => window.matchMedia(requete).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(requete)
+    const suivre = () => setHaute(mq.matches)
+    mq.addEventListener("change", suivre)
+    return () => mq.removeEventListener("change", suivre)
+  }, [])
+  return haute ? 10 : 5
+}
+
+function SousListe({
+  titre,
+  lien,
+  vide,
+  children,
+}: {
+  titre: string
+  lien: string
+  vide: string | null
+  children: React.ReactNode
+}) {
   return (
-    <Card className="min-w-0 p-4">
-      <h3 className="mb-2 text-sm font-medium">{titre}</h3>
-      {lignes.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aucune chaîne.</p>
-      ) : (
-        <ol className="space-y-1.5 text-sm">
-          {lignes.map((l) => (
-            <li key={l.ligne.id} className="flex items-baseline justify-between gap-2">
-              <span className="min-w-0 truncate">{l.ligne.nom}</span>
-              <span className="shrink-0 tabular-nums text-muted-foreground">
-                {l.sortie}
-                {l.objectif != null && ` / ${l.objectif}`} · {pct(l.taux)}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
-    </Card>
+    <div className="px-4 py-3">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <h3 className="text-xs font-medium text-muted-foreground">{titre}</h3>
+        <Link
+          to={lien}
+          className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+        >
+          Voir tout
+          <ArrowRight className="size-3" />
+        </Link>
+      </div>
+      {vide ? <p className="py-2 text-sm text-muted-foreground">{vide}</p> : <ol>{children}</ol>}
+    </div>
   )
 }
 
 export function AtelierPage() {
+  const navigate = useNavigate()
   const ref = useReference()
   const [dateChoisie, setDateChoisie] = useState("")
   const [groupe, setGroupe] = useState("")
+  const [onglet, setOnglet] = useState<"chaines" | "traiter">("chaines")
+  const [majA, setMajA] = useState<Date | null>(null)
+  const taille = useTailleListe()
   const jour = dateChoisie || ref.dateReference
 
   const atelier = useResource(
@@ -84,18 +119,39 @@ export function AtelierPage() {
         ? tunicotexApi
             .commandesARisque(undefined, undefined, jour)
             .then((r) => r.filter((o) => o.statut === "en_retard"))
-        : Promise.resolve([]),
+        : Promise.resolve([] as OFRisque[]),
     [jour],
   )
 
+  const { reload: rechargerRef } = ref
+  const { reload: rechargerAtelier } = atelier
+  const { reload: rechargerRetards } = retards
+  // Écran laissé allumé : on relit la référence puis les données toutes les 5 minutes.
+  useEffect(() => {
+    const t = setInterval(() => {
+      oublierReference()
+      rechargerRef()
+      void rechargerAtelier()
+      void rechargerRetards()
+    }, RAFRAICHISSEMENT_MS)
+    return () => clearInterval(t)
+  }, [rechargerRef, rechargerAtelier, rechargerRetards])
+
   const donnees = atelier.data
+  useEffect(() => {
+    if (donnees) setMajA(new Date())
+  }, [donnees])
+
   const toutes = useMemo(() => donnees?.lignes ?? [], [donnees])
   const lignes = useMemo(
     () => (groupe ? toutes.filter((l) => String(l.ligne.groupe?.id ?? "") === groupe) : toutes),
     [toutes, groupe],
   )
-  const avecLectures = useMemo(() => lignes.filter((l) => l.a_des_lectures), [lignes])
-  const sansLectures = lignes.filter((l) => !l.a_des_lectures)
+  const comparables = useMemo(
+    () => lignes.filter(comparable).sort((a, b) => (a.taux ?? 0) - (b.taux ?? 0)),
+    [lignes],
+  )
+  const sousObjectif = comparables.filter((l) => (l.taux ?? 0) < 1)
 
   const tuiles = useMemo<Tuile[]>(() => {
     if (!donnees) return []
@@ -105,7 +161,6 @@ export function AtelierPage() {
     let objectif = s.objectif
     let taux = s.taux
     let rendement = s.rendement_moyen
-    let sous = s.lignes_sous_objectif.length
     if (groupe) {
       const ciblees = lignes.filter(
         (l) => l.ligne.nature === "confection" && l.objectif != null && l.a_des_lectures,
@@ -119,25 +174,32 @@ export function AtelierPage() {
       const presence = lignes.reduce((a, l) => a + l.minutes_presence, 0)
       rendement =
         presence > 0 ? lignes.reduce((a, l) => a + l.minutes_produites, 0) / presence : null
-      sous = ciblees.filter(sousObjectif).length
     }
     const suffixe = ref.calibre ? "" : " (estimé)"
+    // La tendance couvre tout l'atelier : pas de mini-courbe quand un groupe est filtré.
+    const courbe = groupe
+      ? undefined
+      : (donnees.tendance ?? []).map((p) => (p.objectif > 0 ? p.sortie / p.objectif : 0))
     return [
-      { libelle: "Pièces sorties", valeur: sortie },
-      { libelle: "Objectif", valeur: objectif > 0 ? objectif : null },
       {
         libelle: "Taux d'atteinte",
         valeur: taux == null ? null : Math.round(taux * 100),
         unite: taux == null ? undefined : "%",
-        etat: taux == null ? "neutre" : taux >= 1 ? "ok" : "alerte",
-        note: objectif > 0 ? `${sortieCible} / ${objectif} (chaînes avec objectif)` : undefined,
+        etat: etatTaux(taux),
+        note: objectif > 0 ? `${sortieCible} / ${objectif} (chaînes avec objectif)` : "aucun objectif",
+        principale: true,
+        courbe,
+      },
+      {
+        libelle: "Pièces sorties",
+        valeur: sortie,
+        note: objectif > 0 ? `objectif ${objectif}` : undefined,
       },
       {
         libelle: `Rendement moyen${suffixe}`,
         valeur: rendement == null ? null : Math.round(rendement * 100),
         unite: rendement == null ? undefined : "%",
       },
-      { libelle: "Chaînes sous objectif", valeur: sous, etat: sous > 0 ? "alerte" : "ok" },
       {
         libelle: "OF en retard",
         valeur: s.nb_of_en_retard,
@@ -147,26 +209,17 @@ export function AtelierPage() {
     ]
   }, [donnees, groupe, lignes, ref.calibre])
 
-  const classement = useMemo(() => {
-    const tri = avecLectures
-      .filter((l) => l.taux != null)
-      .sort((a, b) => (b.taux ?? 0) - (a.taux ?? 0))
-    const meilleurs = tri.slice(0, 3)
-    const ids = new Set(meilleurs.map((l) => l.ligne.id))
-    const pires = tri
-      .slice(-3)
-      .reverse()
-      .filter((l) => !ids.has(l.ligne.id))
-    return { meilleurs, pires }
-  }, [avecLectures])
-
-  const donneesBarres = avecLectures.map((l) => ({
+  const donneesBarres = comparables.map((l) => ({
     id: l.ligne.id,
     nom: l.ligne.code || l.ligne.nom,
     sortie: l.sortie,
     objectif: l.objectif ?? 0,
-    alerte: sousObjectif(l),
+    alerte: (l.taux ?? 0) < 1,
   }))
+  const pireRetards = useMemo(
+    () => [...(retards.data ?? [])].sort((a, b) => b.jours - a.jours).slice(0, taille),
+    [retards.data, taille],
+  )
 
   const jourAffiche = jjmm(jour || "")
 
@@ -189,8 +242,14 @@ export function AtelierPage() {
   )
 
   return (
-    <Page title="Tableau de bord" description="Production de l'atelier" actions={actions}>
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+    <Page
+      fullHeight
+      title="Tableau de bord"
+      description="Production de l'atelier"
+      meta={<DateDonnees />}
+      actions={actions}
+    >
+      <div className="mb-3 flex shrink-0 flex-wrap items-center gap-3">
         <TextInput
           type="date"
           aria-label="Date"
@@ -211,9 +270,15 @@ export function AtelierPage() {
             </option>
           ))}
         </Select>
+        {majA && (
+          <span className="ml-auto text-xs text-muted-foreground">
+            Mis à jour à{" "}
+            {majA.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+          </span>
+        )}
       </div>
 
-      {ref.loading || atelier.loading ? (
+      {ref.loading || (atelier.loading && !donnees) ? (
         <Chargement />
       ) : atelier.error || ref.error ? (
         <ErreurDivatex
@@ -226,111 +291,154 @@ export function AtelierPage() {
       ) : !donnees || !donnees.situation.a_des_lectures ? (
         <Vide raison="Aucune lecture DIVA ce jour-là." />
       ) : (
-        <div className="space-y-4">
-          <KpiTiles tuiles={tuiles} />
-
-          <Card className="min-w-0 p-4">
-            <h3 className="mb-3 text-sm font-medium">Sortie vs objectif</h3>
-            {donneesBarres.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">aucune lecture</p>
-            ) : (
-              <div className="h-72 min-w-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={donneesBarres}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="nom" tick={{ fontSize: 11 }} interval={0} />
-                    <YAxis tick={{ fontSize: 11 }} width={40} />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="sortie" name="Sortie" fill={NEUTRE}>
-                      {donneesBarres.map((d) => (
-                        <Cell key={d.id} fill={d.alerte ? ROUGE : NEUTRE} />
-                      ))}
-                    </Bar>
-                    <Bar dataKey="objectif" name="Objectif" fill={OBJECTIF} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-            {sansLectures.length > 0 && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Aucune lecture : {sansLectures.map((l) => l.ligne.nom).join(", ")}
-              </p>
-            )}
-            {lignes.some((l) => l.objectif_perime && l.objectif_date) && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                {lignes
-                  .filter((l) => l.objectif_perime && l.objectif_date)
-                  .map((l) => `${l.ligne.nom} : objectif du ${jjmm(l.objectif_date!)}`)
-                  .join(" · ")}
-              </p>
-            )}
-          </Card>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <ListeClassement titre="3 meilleures chaînes" lignes={classement.meilleurs} />
-            <ListeClassement titre="3 chaînes les plus en retard" lignes={classement.pires} />
+        <div className="flex min-w-0 flex-col gap-3 lg:min-h-0 lg:flex-1">
+          <div className="shrink-0">
+            <KpiTiles tuiles={tuiles} colonnes={4} />
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card className="min-w-0 p-4">
-              <h3 className="mb-3 text-sm font-medium">Tendance sur 7 jours</h3>
-              <div className="h-56 min-w-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={(donnees.tendance ?? []).map((p) => ({ ...p, j: jjmm(p.jour) }))}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="j" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} width={40} />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="sortie" name="Sortie" stroke={NEUTRE} strokeWidth={2} />
-                    <Line
-                      type="monotone"
-                      dataKey="objectif"
-                      name="Objectif"
-                      stroke={OBJECTIF}
-                      strokeDasharray="4 4"
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
+          <div className="flex gap-1 rounded-lg bg-muted p-1 md:hidden" role="tablist">
+            {(
+              [
+                ["chaines", "Chaînes"],
+                ["traiter", "À traiter"],
+              ] as const
+            ).map(([id, lib]) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={onglet === id}
+                onClick={() => setOnglet(id)}
+                className={cn(
+                  "flex-1 rounded-md py-1.5 text-sm font-medium text-muted-foreground",
+                  onglet === id && "bg-background text-foreground shadow-sm",
+                )}
+              >
+                {lib}
+              </button>
+            ))}
+          </div>
 
-            <Card className="min-w-0 p-4">
-              <h3 className="mb-3 text-sm font-medium">OF en retard (7 derniers jours)</h3>
-              {retards.loading ? (
-                <Chargement />
-              ) : retards.error ? (
-                <ErreurDivatex
-                  onRetry={() => void retards.reload()}
-                  message={messageErreur(retards.error)}
-                />
-              ) : (retards.data ?? []).length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Aucun OF en retard sur les 7 derniers jours.
+          <div className="grid min-w-0 gap-3 lg:min-h-0 lg:flex-1 lg:grid-cols-12">
+            <Panneau
+              titre="Sortie vs objectif par chaîne"
+              compteur={comparables.length}
+              extra={<DonneesAVerifier lignes={lignes} />}
+              className={cn("lg:col-span-7", onglet !== "chaines" && "max-md:hidden")}
+              corpsClassName="p-2"
+            >
+              {donneesBarres.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  Aucune chaîne avec un objectif et des lectures
+                  {groupe ? " dans ce groupe" : ""}.
                 </p>
               ) : (
-                <ul className="space-y-1.5 text-sm">
-                  {(retards.data ?? []).map((r) => (
-                    <li key={r.of.id} className="flex items-baseline justify-between gap-2">
-                      <Link
-                        to={`/app/of?id=${r.of.id}`}
-                        className="min-w-0 truncate font-medium hover:underline"
+                <div
+                  className="h-full min-h-0"
+                  style={{ minHeight: Math.max(220, donneesBarres.length * 26) }}
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={donneesBarres}
+                      layout="vertical"
+                      barGap={2}
+                      margin={{ top: 4, right: 16, bottom: 4, left: 4 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 11 }} />
+                      <YAxis
+                        type="category"
+                        dataKey="nom"
+                        width={72}
+                        tick={{ fontSize: 11 }}
+                        interval={0}
+                      />
+                      <Tooltip />
+                      <Bar
+                        dataKey="sortie"
+                        name="Sortie"
+                        fill={NEUTRE}
+                        cursor="pointer"
+                        isAnimationActive={false}
+                        onClick={(d) => {
+                          const id = (d as { payload?: { id?: number } }).payload?.id
+                          if (id != null) navigate(`/app/chaines?id=${id}`)
+                        }}
                       >
-                        {r.of.numero}
-                        {r.of.client && (
-                          <span className="ml-2 font-normal text-muted-foreground">{r.of.client}</span>
-                        )}
-                      </Link>
-                      <span className="shrink-0 tabular-nums text-destructive">
-                        {r.jours} j de retard
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                        {donneesBarres.map((d) => (
+                          <Cell key={d.id} fill={d.alerte ? ROUGE : NEUTRE} />
+                        ))}
+                      </Bar>
+                      <Bar
+                        dataKey="objectif"
+                        name="Objectif"
+                        fill={OBJECTIF}
+                        isAnimationActive={false}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               )}
-            </Card>
+            </Panneau>
+
+            <Panneau
+              titre="À traiter"
+              className={cn("lg:col-span-5", onglet !== "traiter" && "max-md:hidden")}
+              corpsClassName="divide-y divide-border/70"
+            >
+              <SousListe
+                titre={`Chaînes sous l'objectif (${sousObjectif.length})`}
+                lien="/app/chaines"
+                vide={sousObjectif.length === 0 ? "Toutes les chaînes sont dans l'objectif." : null}
+              >
+                {sousObjectif.slice(0, taille).map((l) => (
+                  <li key={l.ligne.id}>
+                    <Link
+                      to={`/app/chaines?id=${l.ligne.id}`}
+                      className="-mx-2 flex items-baseline justify-between gap-3 rounded-md px-2 py-1 text-sm hover:bg-accent/50"
+                    >
+                      <span className="min-w-0 truncate font-medium" title={l.ligne.nom}>
+                        {l.ligne.code || l.ligne.nom}
+                      </span>
+                      <span className="shrink-0 tabular-nums text-muted-foreground">
+                        {l.sortie} / {l.objectif} ·{" "}
+                        <span className="text-destructive">{pct(l.taux)}</span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </SousListe>
+              <SousListe
+                titre={`OF en retard (${retards.data?.length ?? 0})`}
+                lien="/app/commandes"
+                vide={
+                  retards.loading
+                    ? "Chargement…"
+                    : retards.error
+                      ? "Retards indisponibles."
+                      : pireRetards.length === 0
+                        ? "Aucun OF en retard sur les 7 derniers jours."
+                        : null
+                }
+              >
+                {pireRetards.map((r) => (
+                  <li key={r.of.id}>
+                    <Link
+                      to={`/app/of?id=${r.of.id}`}
+                      className="-mx-2 flex items-baseline justify-between gap-3 rounded-md px-2 py-1 text-sm hover:bg-accent/50"
+                    >
+                      <span className="min-w-0 truncate" title={r.of.numero}>
+                        <span className="font-medium">{r.of.numero}</span>
+                        {r.of.client && (
+                          <span className="ml-2 text-muted-foreground">{r.of.client}</span>
+                        )}
+                      </span>
+                      <span className="shrink-0 tabular-nums text-destructive">{r.jours} j</span>
+                    </Link>
+                  </li>
+                ))}
+              </SousListe>
+            </Panneau>
           </div>
         </div>
       )}
