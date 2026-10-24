@@ -236,7 +236,10 @@ export function AdminConversations() {
                     <BadgeCanal canal={c.canal} />
                   </div>
                   <div className="mt-0.5 text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 truncate">
-                    {c.apercu || "(pas encore de message)"}
+                    {c.apercu ||
+                      (c.canal === "whatsapp"
+                        ? "Conversation antérieure — ouvrez-la pour lire les messages"
+                        : "(pas encore de message)")}
                   </div>
                   <div className="mt-0.5 text-[10px] font-bold text-zinc-500 font-mono">
                     {formaterDate(c.date_maj)}
