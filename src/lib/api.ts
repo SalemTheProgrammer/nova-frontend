@@ -304,4 +304,30 @@ export const adminApi = {
     data: Partial<{ nom_complet: string; actif: boolean; outils_autorises: string[] }>,
   ) => request<User>("PATCH", `/admin/users/${id}`, data),
   deleteUser: (id: number) => request<void>("DELETE", `/admin/users/${id}`),
+  /** Conversations des utilisateurs avec Nova (web et WhatsApp), en lecture seule. */
+  conversations: (utilisateurId?: number) =>
+    request<ConversationResume[]>(
+      "GET",
+      utilisateurId != null
+        ? `/admin/conversations?utilisateur_id=${utilisateurId}`
+        : "/admin/conversations",
+    ),
+  conversation: (threadId: string) =>
+    request<ConversationDetail>("GET", `/admin/conversations/${encodeURIComponent(threadId)}`),
+}
+
+export interface ConversationResume {
+  thread_id: string
+  canal: "web" | "whatsapp"
+  utilisateur_id: number | null
+  utilisateur_nom: string
+  telephone: string
+  apercu: string
+  date_creation: string
+  date_maj: string
+}
+
+export interface ConversationDetail {
+  conversation: ConversationResume
+  turns: import("@/hooks/useAgentChat").AgentTurn[]
 }

@@ -104,9 +104,12 @@ function ToolStep({
 export function AgentTurnView({
   turn,
   onQuickReply,
+  userLabel = "Vous",
 }: {
   turn: AgentTurn
   onQuickReply?: (text: string) => void
+  /** Nom affiché au-dessus des messages de l'utilisateur (page admin : son nom). */
+  userLabel?: string
 }) {
   const isUser = turn.role === "user"
   return (
@@ -128,7 +131,7 @@ export function AgentTurnView({
       <div className={cn("min-w-0 flex-1 space-y-1.5", isUser && "flex flex-col items-end")}>
         <div className="flex items-center gap-1.5 px-1">
           <span className="text-xs font-semibold text-foreground">
-            {isUser ? "Vous" : "Nova"}
+            {isUser ? userLabel : "Nova"}
           </span>
         </div>
         {turn.segments.map((segment, i) =>

@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Cpu,
   Loader2,
+  MessagesSquare,
   Plus,
   RefreshCw,
   Search,
@@ -20,6 +21,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { adminApi, type ToolCatalogItem, type User } from "@/lib/api"
+import { AdminConversations } from "@/components/admin/AdminConversations"
 
 /** Regroupe le catalogue d'outils par catégorie, en conservant l'ordre. */
 function grouperOutils(tools: ToolCatalogItem[]): { categorie: string; outils: ToolCatalogItem[] }[] {
@@ -44,6 +46,7 @@ export function AdminUsersPage() {
   const [erreur, setErreur] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIF" | "INACTIF" | "ADMIN">("ALL")
+  const [onglet, setOnglet] = useState<"utilisateurs" | "conversations">("utilisateurs")
 
   const groupes = useMemo(() => grouperOutils(tools), [tools])
   const selected = users.find((u) => u.id === selectedId) ?? null
@@ -133,6 +136,7 @@ export function AdminUsersPage() {
         </div>
 
         {/* Boutons d'action en-tête */}
+        {onglet === "utilisateurs" && (
         <div className="flex items-center gap-2">
           <Button
             size="sm"
@@ -156,8 +160,37 @@ export function AdminUsersPage() {
             <RefreshCw className={cn("size-3.5", chargement && "animate-spin text-violet-600")} />
           </Button>
         </div>
+        )}
       </div>
 
+      {/* ----------------- ONGLETS ----------------- */}
+      <div className="shrink-0 flex items-center gap-1.5">
+        {(
+          [
+            ["utilisateurs", "Utilisateurs", Users],
+            ["conversations", "Conversations", MessagesSquare],
+          ] as const
+        ).map(([valeur, libelle, Icone]) => (
+          <button
+            key={valeur}
+            type="button"
+            onClick={() => setOnglet(valeur)}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer",
+              onglet === valeur
+                ? "bg-violet-600 text-white shadow-xs"
+                : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white",
+            )}
+          >
+            <Icone className="size-3.5" /> {libelle}
+          </button>
+        ))}
+      </div>
+
+      {onglet === "conversations" ? (
+        <AdminConversations />
+      ) : (
+      <>
       {/* ----------------- 4 CARTES KPI STATISTIQUES ----------------- */}
       <div className="shrink-0 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         <div className="bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 flex items-center justify-between shadow-xs">
@@ -403,6 +436,8 @@ export function AdminUsersPage() {
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   )
 }
