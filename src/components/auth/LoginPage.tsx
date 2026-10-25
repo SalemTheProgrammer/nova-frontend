@@ -142,6 +142,14 @@ export function LoginPage() {
   const [code, setCode] = useState("")
   const [erreur, setErreur] = useState<string | null>(null)
   const [chargement, setChargement] = useState(false)
+  // Délai avant de pouvoir redemander un code (s) : évite les rafales de renvois.
+  const [renvoiDans, setRenvoiDans] = useState(0)
+  const [codeRenvoye, setCodeRenvoye] = useState(false)
+  useEffect(() => {
+    if (renvoiDans <= 0) return
+    const t = window.setTimeout(() => setRenvoiDans((s) => s - 1), 1000)
+    return () => window.clearTimeout(t)
+  }, [renvoiDans])
   useEffect(() => {
     document.title = "Connexion — Nova Opsis · Tunicotex"
   }, [])
@@ -157,6 +165,7 @@ export function LoginPage() {
     try {
       await authApi.requestCode(telephone.trim())
       setEtape("code")
+      setRenvoiDans(30)
     } catch (err) {
       setErreur(err instanceof Error ? err.message : "Le code n'a pas pu être envoyé.")
     } finally {
@@ -181,6 +190,15 @@ export function LoginPage() {
     } finally {
       setChargement(false)
     }
+  }
+
+  /** Redemande un code sans quitter l'écran de saisie (le précédent reste valable jusqu'à expiration). */
+  async function renvoyerCode() {
+    if (renvoiDans > 0 || chargement) return
+    setCode("")
+    setCodeRenvoye(false)
+    await demanderCode()
+    setCodeRenvoye(true)
   }
 
   function revenirAuNumero() {
@@ -270,9 +288,20 @@ export function LoginPage() {
                   onComplete={(complet) => void verifierCode(complet)}
                   disabled={chargement}
                 />
-                <p className="text-sm text-muted-foreground">
-                  Envoyé au <span className="font-medium text-foreground">{telephone}</span>.
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+                  <p>
+                    {codeRenvoye && !erreur ? "Nouveau code envoyé au " : "Envoyé au "}
+                    <span className="font-medium text-foreground">{telephone}</span>.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void renvoyerCode()}
+                    disabled={renvoiDans > 0 || chargement}
+                    className="font-medium text-foreground underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground disabled:no-underline"
+                  >
+                    {renvoiDans > 0 ? `Renvoyer le code (${renvoiDans} s)` : "Renvoyer le code"}
+                  </button>
+                </div>
               </div>
 
               {erreur && (
